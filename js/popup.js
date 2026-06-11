@@ -36,8 +36,8 @@ makePieceBtn.addEventListener('click', () => {
 
   const taskData = {
     taskname: taskName,
-    duedate: dueDateInput.value,
-    content: taskContentInput.value,
+    date: dueDateInput.value,
+    note: taskContentInput.value,
     url: taskUrlInput.value,
     source: taskSourceInput.value,
     state: taskstate.value,

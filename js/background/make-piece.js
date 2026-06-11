@@ -11,6 +11,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   return true;
 });
 
+const formatDate = (date) => date.toISOString().split('T')[0];
+
 async function handleMakePiece(data) {
   // 1. Storageから設定されたエンドポイントURLを取得
   const storage = await chrome.storage.local.get([
@@ -27,17 +29,19 @@ async function handleMakePiece(data) {
     return;
   }
 
+  const headers = { 'Content-Type': 'application/json' };
+  if (makePieceApiKey) headers['X-API-KEY'] = makePieceApiKey;
+
   // 2. 送信データの組み立て
-  const fetchData = {
-    // _Area: 'Work',
-    // _Type: 'Task',
-    status: data.state,
+  const body = JSON.stringify({
+    status: data.state || 'INBOX',
     title: data.taskname || 'TASK FROM FARBE',
-    dueDate: data.duedate || formatDate(new Date()),
+    area: 'Work',
+    type: 'Task',
+    date: data.date || formatDate(new Date()),
     source: data.source || 'LOCAL',
-    content: data.content || '',
-    // icon: '☑️',
-  };
+    note: data.note || '',
+  });
 
   if (data.url) fetchData.url = data.url;
 
@@ -45,11 +49,8 @@ async function handleMakePiece(data) {
   try {
     const response = await fetch(endpoint, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-KEY': makePieceApiKey,
-      },
-      body: JSON.stringify(fetchData),
+      headers,
+      body,
     });
 
     if (!response.ok) {
@@ -61,5 +62,3 @@ async function handleMakePiece(data) {
     console.error('MakePiece Fetch error:', error);
   }
 }
-
-const formatDate = (date) => date.toISOString().split('T')[0];
