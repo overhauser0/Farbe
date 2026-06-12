@@ -57,6 +57,14 @@
           >
         </nav>
       </div>
+      <div class="nav-group">
+        <div class="nav-group-title">Atlas</div>
+        <nav class="nav-menu">
+          <a class="nav-link" data-app="atlas" data-target="websocket-setting"
+            >WebSocket</a
+          >
+        </nav>
+      </div>
     </aside>
 
     <main class="main-content" id="scroll-area">
@@ -273,6 +281,54 @@
                 </li>
                 <li>上記の情報を入力して保存</li>
               </ol>
+            </div>
+          </div>
+        </section>
+      </div>
+      <div id="app-atlas" class="app-container">
+        <section id="websocket-setting" class="section">
+          <div
+            style="
+              display: flex;
+              align-items: center;
+              gap: 12px;
+              margin-bottom: 15px;
+            "
+          >
+            <h2 style="margin: 0">WebSocket Setting</h2>
+            <span
+              id="ws-status-badge"
+              style="
+                padding: 4px 10px;
+                border-radius: 6px;
+                font-size: 12px;
+                font-weight: bold;
+                background: rgba(255, 255, 255, 0.1);
+                transition: all 0.3s;
+              "
+            >
+              ⚪️ Checking...
+            </span>
+          </div>
+          <p class="desc">
+            Atlasサーバーと接続し、iPad等の他端末からの指示（URL展開など）を受信します。
+          </p>
+          <div class="rule-card">
+            <div class="input-group">
+              <label style="width: 120px">WebSocket URL:</label>
+              <input
+                type="text"
+                id="ws-url"
+                placeholder="wss://atlas.your-domain.com"
+              />
+            </div>
+            <div class="input-group" style="margin-top: 15px">
+              <label style="width: 120px">Device Name:</label>
+              <input
+                type="text"
+                id="ws-device-name"
+                placeholder="例: 自宅デスクトップ"
+              />
             </div>
           </div>
         </section>

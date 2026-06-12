@@ -342,10 +342,12 @@ async function sortAndGroupTabs() {
 }
 
 // メニュー登録（既存の登録処理にappend）
-chrome.contextMenus.create({
-  id: 'closeAllAndNewTab',
-  title: '🗑️ タブをすべて閉じる - TaxiTabs',
-  contexts: ['action'],
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.create({
+    id: 'closeAllAndNewTab',
+    title: '🗑️ タブをすべて閉じる - TaxiTabs',
+    contexts: ['action'],
+  });
 });
 
 // クリック処理（既存のonClickedリスナーにcaseを追加）

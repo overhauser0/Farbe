@@ -195,6 +195,10 @@ document.getElementById('save-rules').onclick = () => {
   const lineAccessToken = document.getElementById('line-token').value.trim();
   const lineUserId = document.getElementById('line-userid').value.trim();
 
+  // Atlas
+  const wsUrl = document.getElementById('ws-url').value.trim();
+  const wsDeviceName = document.getElementById('ws-device-name').value.trim();
+
   chrome.storage.local.set(
     {
       tabRules,
@@ -207,6 +211,8 @@ document.getElementById('save-rules').onclick = () => {
       lineEnabled,
       lineAccessToken,
       lineUserId,
+      wsUrl,
+      wsDeviceName,
     },
     () => {
       const msg = document.getElementById('message');
@@ -251,6 +257,8 @@ chrome.storage.local.get(
     'lineEnabled',
     'lineAccessToken',
     'lineUserId',
+    'wsUrl',
+    'wsDeviceName',
   ],
   (result) => {
     // Taxi Tabs
@@ -286,6 +294,10 @@ chrome.storage.local.get(
       if (e.target.checked) lineContainer.classList.remove('hidden');
       else lineContainer.classList.add('hidden');
     });
+
+    // Atlas
+    document.getElementById('ws-url').value = result.wsUrl || '';
+    document.getElementById('ws-device-name').value = result.wsDeviceName || '';
 
     setTimeout(updateScrollSpy, 50);
   },
@@ -391,6 +403,47 @@ document.getElementById('delete-all-notes').addEventListener('click', () => {
 // 設定画面を開いた時（初期化時）にメモ一覧を描画する
 document.addEventListener('DOMContentLoaded', () => {
   renderNotes();
+});
+
+// ==========================================
+// WebSocket ステータス表示のリアルタイム更新
+// ==========================================
+
+function updateWsBadge(status) {
+  const badge = document.getElementById('ws-status-badge');
+  if (!badge) return;
+
+  if (status === 'connected') {
+    badge.textContent = '🟢 Connected';
+    badge.style.color = '#4ade80'; // Noir Glass風のネオングリーン
+    badge.style.background = 'rgba(74, 222, 128, 0.15)';
+    badge.style.border = '1px solid rgba(74, 222, 128, 0.3)';
+  } else if (status === 'connecting') {
+    badge.textContent = '🟡 Connecting...';
+    badge.style.color = '#facc15';
+    badge.style.background = 'rgba(250, 204, 21, 0.15)';
+    badge.style.border = '1px solid rgba(250, 204, 21, 0.3)';
+  } else {
+    badge.textContent = '🔴 Disconnected';
+    badge.style.color = '#f87171';
+    badge.style.background = 'rgba(248, 113, 113, 0.15)';
+    badge.style.border = '1px solid rgba(248, 113, 113, 0.3)';
+  }
+}
+
+// 1. 設定画面を開いた瞬間に、現在のステータスを問い合わせる
+chrome.runtime.sendMessage({ type: 'GET_WS_STATUS' }, (response) => {
+  if (chrome.runtime.lastError) return;
+  if (response && response.status) {
+    updateWsBadge(response.status);
+  }
+});
+
+// 2. バックグラウンドからのステータス変更通知をリアルタイムに受け取る
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg.type === 'WS_STATUS_UPDATE') {
+    updateWsBadge(msg.status);
+  }
 });
 
 // 1. メニュークリック時の挙動（アプリ切り替え＆スクロール）
