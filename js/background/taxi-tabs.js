@@ -12,6 +12,14 @@ function matchPattern(url, pattern) {
   return regex.test(url);
 }
 
+// 追加: URL文字列を配列に変換する共通ヘルパー関数
+function getPatterns(urlsStr) {
+  return urlsStr
+    .split('\n')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
 let isSorting = false;
 
 // タブの更新検知（ソート・ピン留め・クローズ処理）
@@ -51,11 +59,9 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     // 2. Auto Pin処理
     let shouldPin = false;
     for (const rule of pinRules) {
-      const patterns = rule.urls
-        .split('\n')
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0);
-      if (patterns.some((pattern) => matchPattern(tab.url, pattern))) {
+      if (
+        getPatterns(rule.urls).some((pattern) => matchPattern(tab.url, pattern))
+      ) {
         shouldPin = true;
         break;
       }
@@ -65,86 +71,56 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
       await chrome.tabs.update(tabId, { pinned: true });
     }
 
-    if (shouldPin || tab.pinned) {
-      if (autoSort) {
-        let isMatch = false;
-        for (const rule of tabRules) {
-          const patterns = rule.urls
-            .split('\n')
-            .map((s) => s.trim())
-            .filter((s) => s.length > 0);
-          if (patterns.some((pattern) => matchPattern(tab.url, pattern))) {
-            isMatch = true;
-            break;
-          }
-        }
-        if (!isMatch && tab.openerTabId) {
-          try {
-            await chrome.tabs.ungroup(tabId);
-          } catch (e) {}
-        }
-        await sortAndGroupTabs();
+    // 3. 共通のルールマッチ判定（重複を排除）
+    let matchedRule = null;
+    for (const rule of tabRules) {
+      if (
+        getPatterns(rule.urls).some((pattern) => matchPattern(tab.url, pattern))
+      ) {
+        matchedRule = rule;
+        break;
       }
-      return;
     }
 
-    // 3. グループ化・ソート処理
+    // 4. グループ化・ソート処理
     if (autoSort) {
-      let isMatch = false;
-      for (const rule of tabRules) {
-        const patterns = rule.urls
-          .split('\n')
-          .map((s) => s.trim())
-          .filter((s) => s.length > 0);
-        if (patterns.some((pattern) => matchPattern(tab.url, pattern))) {
-          isMatch = true;
-          break;
-        }
-      }
-      if (!isMatch && tab.openerTabId) {
+      // autoSortが有効な場合（ピン留め状態に関わらずソートを実行）
+      if (!matchedRule && tab.openerTabId) {
         try {
           await chrome.tabs.ungroup(tabId);
         } catch (e) {}
       }
       await sortAndGroupTabs();
     } else {
+      // autoSortが無効で、かつピン留め対象のタブはここで終了
+      if (shouldPin || tab.pinned) return;
+
       isSorting = true;
       try {
-        let isMatch = false;
-        for (const rule of tabRules) {
-          const patterns = rule.urls
-            .split('\n')
-            .map((s) => s.trim())
-            .filter((s) => s.length > 0);
-          if (patterns.some((pattern) => matchPattern(tab.url, pattern))) {
-            isMatch = true;
-            const existingGroups = await chrome.tabGroups.query({
-              title: rule.title,
-              windowId: tab.windowId,
-            });
-            let groupId;
-            if (existingGroups.length > 0) {
-              groupId = existingGroups[0].id;
-              if (tab.groupId !== groupId) {
-                await chrome.tabs.group({ tabIds: tabId, groupId: groupId });
-              }
-            } else {
-              groupId = await chrome.tabs.group({ tabIds: tabId });
-              await chrome.tabGroups.update(groupId, {
-                color: rule.color,
-                title: rule.title,
-              });
-              setTimeout(() => {
-                chrome.tabGroups
-                  .update(groupId, { title: rule.title })
-                  .catch(() => {});
-              }, 150);
+        if (matchedRule) {
+          const existingGroups = await chrome.tabGroups.query({
+            title: matchedRule.title,
+            windowId: tab.windowId,
+          });
+          let groupId;
+          if (existingGroups.length > 0) {
+            groupId = existingGroups[0].id;
+            if (tab.groupId !== groupId) {
+              await chrome.tabs.group({ tabIds: tabId, groupId: groupId });
             }
-            break;
+          } else {
+            groupId = await chrome.tabs.group({ tabIds: tabId });
+            await chrome.tabGroups.update(groupId, {
+              color: matchedRule.color,
+              title: matchedRule.title,
+            });
+            setTimeout(() => {
+              chrome.tabGroups
+                .update(groupId, { title: matchedRule.title })
+                .catch(() => {});
+            }, 150);
           }
-        }
-
-        if (!isMatch && tab.openerTabId) {
+        } else if (tab.openerTabId) {
           try {
             await chrome.tabs.ungroup(tabId);
           } catch (e) {}
@@ -156,21 +132,6 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
         isSorting = false;
       }
     }
-  }
-});
-
-// コンテキストメニュー（右クリック）の設定
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.create({
-    id: 'sort-tabs',
-    title: '🗃️ タブを整理・並び替え - TaxiTabs',
-    contexts: ['action'],
-  });
-});
-
-chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId === 'sort-tabs') {
-    sortAndGroupTabs();
   }
 });
 
@@ -204,15 +165,17 @@ async function sortAndGroupTabs() {
     const unpinnedTabs = tabs.filter((t) => !t.pinned);
     if (unpinnedTabs.length === 0) return;
 
+    // 改善：各ルールのURL文字列をループ外で一度だけ配列化（パース）しておく
+    const parsedRules = tabRules.map((rule) => ({
+      ...rule,
+      patterns: getPatterns(rule.urls),
+    }));
+
     const getRank = (tab) => {
-      for (let g = 0; g < tabRules.length; g++) {
-        const rule = tabRules[g];
-        const patterns = rule.urls
-          .split('\n')
-          .map((s) => s.trim())
-          .filter((s) => s.length > 0);
-        for (let p = 0; p < patterns.length; p++) {
-          if (matchPattern(tab.url, patterns[p])) {
+      for (let g = 0; g < parsedRules.length; g++) {
+        const rule = parsedRules[g];
+        for (let p = 0; p < rule.patterns.length; p++) {
+          if (matchPattern(tab.url, rule.patterns[p])) {
             return {
               groupIdx: g,
               patternIdx: p,
@@ -341,19 +304,27 @@ async function sortAndGroupTabs() {
   }
 }
 
-// メニュー登録（既存の登録処理にappend）
+// コンテキストメニュー（右クリック）の設定を1つに統合
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: 'closeAllAndNewTab',
-    title: '🗑️ タブをすべて閉じる - TaxiTabs',
+    title: '🗑️ タブをすべて閉じる',
+    contexts: ['action'],
+  });
+  chrome.contextMenus.create({
+    id: 'sort-tabs',
+    title: '🗃️ タブを整理・並び替え',
     contexts: ['action'],
   });
 });
 
-// クリック処理（既存のonClickedリスナーにcaseを追加）
+// クリック処理
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === 'closeAllAndNewTab') {
     handleCloseAllAndNewTab();
+  }
+  if (info.menuItemId === 'sort-tabs') {
+    sortAndGroupTabs();
   }
 });
 
@@ -362,13 +333,8 @@ async function handleCloseAllAndNewTab() {
     'closeAllIncludePinned',
   );
 
-  // 既存タブを先に取得
   const existingTabs = await chrome.tabs.query({});
-
-  // 新規タブを作成し、IDを受け取る
   const newTab = await chrome.tabs.create({});
-
-  // 取得済みの既存タブのみを対象に削除
   const tabsToClose = existingTabs
     .filter((t) => (closeAllIncludePinned ? true : !t.pinned))
     .map((t) => t.id);

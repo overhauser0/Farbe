@@ -32,7 +32,7 @@
   },
   "options_page": "options.html",
   "action": {
-    "default_title": "Farbe"
+    "default_popup": "popup.html"
   },
   "commands": {
     "_execute_action": {

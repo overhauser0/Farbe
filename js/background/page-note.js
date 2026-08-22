@@ -6,7 +6,7 @@
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: 'open-page-note',
-    title: '📝 メモを書く- PageNote',
+    title: '📝 メモを書く',
     contexts: ['action'], // 拡張機能アイコンの右クリックメニューに表示
   });
 });

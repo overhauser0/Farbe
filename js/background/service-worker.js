@@ -8,3 +8,10 @@ import './make-piece.js';
 import './diverse-observer.js';
 import './page-note.js';
 import './remote-receiver.js';
+
+// ==========================================
+// アイコンクリックでサイドパネルを開く設定
+// ==========================================
+chrome.sidePanel
+  .setPanelBehavior({ openPanelOnActionClick: true })
+  .catch(console.error);

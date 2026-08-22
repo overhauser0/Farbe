@@ -14,15 +14,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 const formatDate = (date) => date.toISOString().split('T')[0];
 
 async function handleMakePiece(data) {
-  // 1. Storageから設定されたエンドポイントURLを取得
-  const storage = await chrome.storage.local.get([
-    'makePieceEndpoint',
-    'makePieceApiKey',
-  ]);
-  const endpoint = storage.makePieceEndpoint;
-  const makePieceApiKey = storage.makePieceApiKey;
+  // Storageから設定されたエンドポイントURLを取得
+  const { makePieceEndpoint, makePieceApiKey } = await chrome.storage.local.get(
+    ['makePieceEndpoint', 'makePieceApiKey'],
+  );
 
-  if (!endpoint) {
+  if (!makePieceEndpoint) {
     console.error(
       'MakePiece Error: Webhook endpoint is not configured in Settings.',
     );
@@ -32,25 +29,26 @@ async function handleMakePiece(data) {
   const headers = { 'Content-Type': 'application/json' };
   if (makePieceApiKey) headers['X-API-KEY'] = makePieceApiKey;
 
-  // 2. 送信データの組み立て
-  const body = JSON.stringify({
+  // 送信データの組み立て
+  const body = {
     status: data.state || 'INBOX',
     title: data.taskname || 'TASK FROM FARBE',
     area: 'Work',
     type: 'Task',
+    note: data.note || '',
     date: data.date || formatDate(new Date()),
     source: data.source || 'LOCAL',
-    note: data.note || '',
-  });
+  };
 
-  if (data.url) fetchData.url = data.url;
+  if (data.note) body.note = data.note;
+  if (data.url) body.url = data.url;
 
-  // 3. Webhookの実行
+  // Webhookの実行
   try {
-    const response = await fetch(endpoint, {
+    const response = await fetch(makePieceEndpoint, {
       method: 'POST',
       headers,
-      body,
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {

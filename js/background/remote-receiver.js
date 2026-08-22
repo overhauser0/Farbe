@@ -42,12 +42,13 @@ function connect() {
       console.log('[Farbe: Remote Sync] WebSocket connected');
       broadcastStatus();
       // 接続時に端末情報をサーバーに登録する
+
       ws.send(
         JSON.stringify({
           type: 'REGISTER_DEVICE',
           clientType: 'extension',
-          deviceId: deviceId,
-          deviceName: deviceName,
+          deviceId,
+          deviceName,
         }),
       );
 
@@ -92,7 +93,9 @@ function reportActive() {
     ws.send(
       JSON.stringify({
         type: 'REPORT_ACTIVE',
-        deviceId: deviceId,
+        clientType: 'extension',
+        deviceId,
+        deviceName,
       }),
     );
   }

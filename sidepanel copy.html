@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Page Note</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+    />
+    <link rel="stylesheet" href="css/global.css" />
+    <style>
+      body {
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        background-color: var(--bg);
+        margin: 0;
+        box-sizing: border-box;
+      }
+      .header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+        font-weight: 600;
+        color: var(--text);
+        font-size: 1.1rem;
+      }
+      .header i {
+        color: var(--primary);
+      }
+      /* パラメータを除外したクリーンなURLを表示するエリア */
+      #current-url {
+        font-size: 0.75rem;
+        color: #6b7280;
+        margin-bottom: 12px;
+        word-break: break-all;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        background: var(--card-bg);
+        padding: 6px 10px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+      }
+      #note-area {
+        flex-grow: 1;
+        width: 100%;
+        resize: none;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 12px;
+        font-size: 0.95rem;
+        background-color: var(--card-bg);
+        color: var(--text);
+        outline: none;
+        box-sizing: border-box;
+        transition:
+          border-color 0.2s,
+          box-shadow 0.2s;
+        line-height: 1.5;
+      }
+      #note-area:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
+      }
+      #note-area:disabled {
+        background-color: #e5e7eb;
+        cursor: not-allowed;
+      }
+      /* 自動保存のステータス表示 */
+      .status {
+        font-size: 0.75rem;
+        color: #10b981;
+        text-align: right;
+        margin-top: 8px;
+        min-height: 16px;
+        opacity: 0;
+        transition: opacity 0.3s;
+        font-weight: 500;
+      }
+      .status.show {
+        opacity: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header"><i class="fas fa-sticky-note"></i> Page Note</div>
+    <div id="current-url">Loading...</div>
+    <textarea
+      id="note-area"
+      placeholder="このページに関するメモを入力..."
+    ></textarea>
+    <div id="save-status" class="status">
+      <i class="fas fa-check"></i> Saved
+    </div>
+
+    <script src="js/sidepanel.js"></script>
+  </body>
+</html>
