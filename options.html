@@ -338,6 +338,20 @@
     <div class="actions-fixed">
       <span id="message">保存しました！</span>
       <button id="btn-sort" class="btn-sort">Sort Tabs</button>
+      <button
+        id="export-settings"
+        class="btn-sort"
+        title="APIキーやアクセストークンを含みます"
+      >
+        設定をエクスポート
+      </button>
+      <button id="import-settings" class="btn-sort">設定をインポート</button>
+      <input
+        id="settings-file"
+        type="file"
+        accept=".json,application/json"
+        hidden
+      />
       <button id="save-rules" class="btn-save">Save Settings</button>
     </div>
 

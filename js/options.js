@@ -10,6 +10,155 @@ const colors = [
   'orange',
 ];
 
+const settingKeys = [
+  'tabRules',
+  'blockRules',
+  'pinRules',
+  'autoSort',
+  'closeAllIncludePinned',
+  'makePieceEndpoint',
+  'makePieceApiKey',
+  'lineEnabled',
+  'lineAccessToken',
+  'lineUserId',
+  'wsUrl',
+  'wsDeviceName',
+];
+
+const defaultSettings = {
+  tabRules: [],
+  blockRules: [],
+  pinRules: [],
+  autoSort: false,
+  closeAllIncludePinned: false,
+  makePieceEndpoint: '',
+  makePieceApiKey: '',
+  lineEnabled: false,
+  lineAccessToken: '',
+  lineUserId: '',
+  wsUrl: '',
+  wsDeviceName: '',
+};
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (character) => {
+    const entities = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    };
+    return entities[character];
+  });
+}
+
+function isRecord(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function validateSettings(value) {
+  if (!isRecord(value)) return null;
+
+  const settings = { ...defaultSettings };
+  let hasKnownSetting = false;
+  const stringFields = [
+    'makePieceEndpoint',
+    'makePieceApiKey',
+    'lineAccessToken',
+    'lineUserId',
+    'wsUrl',
+    'wsDeviceName',
+  ];
+  const booleanFields = ['autoSort', 'closeAllIncludePinned', 'lineEnabled'];
+
+  if ('tabRules' in value) {
+    hasKnownSetting = true;
+    if (
+      !Array.isArray(value.tabRules) ||
+      !value.tabRules.every(
+        (rule) =>
+          isRecord(rule) &&
+          typeof rule.title === 'string' &&
+          colors.includes(rule.color) &&
+          typeof rule.urls === 'string',
+      )
+    ) {
+      return null;
+    }
+    settings.tabRules = value.tabRules.map(({ title, color, urls }) => ({
+      title,
+      color,
+      urls,
+    }));
+  }
+
+  if ('blockRules' in value) {
+    hasKnownSetting = true;
+    if (
+      !Array.isArray(value.blockRules) ||
+      !value.blockRules.every(
+        (rule) =>
+          isRecord(rule) &&
+          (rule.openerUrl === undefined ||
+            typeof rule.openerUrl === 'string') &&
+          (rule.targetUrl === undefined || typeof rule.targetUrl === 'string'),
+      )
+    ) {
+      return null;
+    }
+    settings.blockRules = value.blockRules.map((rule) => ({
+      openerUrl: rule.openerUrl || '',
+      targetUrl: rule.targetUrl || '',
+    }));
+  }
+
+  if ('pinRules' in value) {
+    hasKnownSetting = true;
+    if (
+      !Array.isArray(value.pinRules) ||
+      !value.pinRules.every(
+        (rule) =>
+          isRecord(rule) &&
+          (rule.memo === undefined || typeof rule.memo === 'string') &&
+          (rule.urls === undefined || typeof rule.urls === 'string'),
+      )
+    ) {
+      return null;
+    }
+    settings.pinRules = value.pinRules.map((rule) => ({
+      memo: rule.memo || '',
+      urls: rule.urls || '',
+    }));
+  }
+
+  for (const key of booleanFields) {
+    if (key in value) {
+      hasKnownSetting = true;
+      if (typeof value[key] !== 'boolean') return null;
+      settings[key] = value[key];
+    }
+  }
+
+  for (const key of stringFields) {
+    if (key in value) {
+      hasKnownSetting = true;
+      if (typeof value[key] !== 'string') return null;
+      settings[key] = value[key];
+    }
+  }
+
+  return hasKnownSetting ? settings : null;
+}
+
+function showMessage(message, isError = false) {
+  const msg = document.getElementById('message');
+  msg.textContent = message;
+  msg.style.color = isError ? '#ef4444' : '#10b981';
+  msg.classList.add('show');
+  setTimeout(() => msg.classList.remove('show'), 3000);
+}
+
 // === 画面描画処理 ===
 function renderTabRules(rules) {
   const container = document.getElementById('tab-rules-container');
@@ -20,7 +169,7 @@ function renderTabRules(rules) {
     div.innerHTML = `
       <div class="rule-header">
         <div class="input-group">
-          <label>名前:</label><input type="text" class="tab-title" value="${rule.title}">
+          <label>名前:</label><input type="text" class="tab-title" value="${escapeHtml(rule.title)}">
           <label>色:</label>
           <select class="tab-color">
             ${colors.map((c) => `<option value="${c}" ${c === rule.color ? 'selected' : ''}>${c}</option>`).join('')}
@@ -33,7 +182,7 @@ function renderTabRules(rules) {
         </div>
       </div>
       <label>対象URL (改行区切り):</label>
-      <textarea class="tab-urls">${rule.urls}</textarea>
+      <textarea class="tab-urls">${escapeHtml(rule.urls)}</textarea>
     `;
     container.appendChild(div);
   });
@@ -56,11 +205,11 @@ function renderBlockRules(rules) {
       <div style="display: flex; gap: 15px; margin-bottom: 5px;">
         <div style="flex: 1;">
           <label>親URL (空白可):</label>
-          <input type="text" class="block-opener" value="${rule.openerUrl || ''}" placeholder="例: *twitter.com*">
+          <input type="text" class="block-opener" value="${escapeHtml(rule.openerUrl || '')}" placeholder="例: *twitter.com*">
         </div>
         <div style="flex: 1;">
           <label>閉じるURL (必須):</label>
-          <input type="text" class="block-target" value="${rule.targetUrl || ''}" placeholder="例: *spam.com*">
+          <input type="text" class="block-target" value="${escapeHtml(rule.targetUrl || '')}" placeholder="例: *spam.com*">
         </div>
       </div>
     `;
@@ -77,7 +226,7 @@ function renderPinRules(rules) {
     div.innerHTML = `
       <div class="rule-header">
         <div class="input-group">
-          <label>メモ:</label><input type="text" class="pin-memo" value="${rule.memo || ''}" placeholder="例: X (Twitter) 用など">
+          <label>メモ:</label><input type="text" class="pin-memo" value="${escapeHtml(rule.memo || '')}" placeholder="例: X (Twitter) 用など">
         </div>
         <div class="controls">
           <button class="btn-up" data-type="pin" data-index="${index}">↑</button>
@@ -86,7 +235,7 @@ function renderPinRules(rules) {
         </div>
       </div>
       <label>対象URL (改行区切り):</label>
-      <textarea class="pin-urls">${rule.urls || ''}</textarea>
+      <textarea class="pin-urls">${escapeHtml(rule.urls || '')}</textarea>
     `;
     container.appendChild(div);
   });
@@ -215,12 +364,90 @@ document.getElementById('save-rules').onclick = () => {
       wsDeviceName,
     },
     () => {
+      if (chrome.runtime.lastError) {
+        showMessage('設定を保存できませんでした', true);
+        return;
+      }
       const msg = document.getElementById('message');
       msg.classList.add('show');
       setTimeout(() => msg.classList.remove('show'), 2000);
     },
   );
 };
+
+document.getElementById('export-settings').addEventListener('click', () => {
+  chrome.storage.local.get(settingKeys, (settings) => {
+    if (chrome.runtime.lastError) {
+      showMessage('設定を読み込めませんでした', true);
+      return;
+    }
+
+    const data = {
+      app: 'Farbe',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      settings: { ...defaultSettings, ...settings },
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: 'application/json',
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `farbe-settings-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showMessage('設定をエクスポートしました');
+  });
+});
+
+const settingsFile = document.getElementById('settings-file');
+document.getElementById('import-settings').addEventListener('click', () => {
+  settingsFile.click();
+});
+
+settingsFile.addEventListener('change', async () => {
+  const file = settingsFile.files[0];
+  settingsFile.value = '';
+  if (!file) return;
+
+  try {
+    const data = JSON.parse(await file.text());
+    if (
+      !isRecord(data) ||
+      data.app !== 'Farbe' ||
+      data.version !== 1
+    ) {
+      throw new Error('対応していない設定ファイルです');
+    }
+    const settings = validateSettings(data.settings);
+    if (!settings) throw new Error('設定ファイルの内容が正しくありません');
+
+    if (
+      !confirm(
+        '現在の設定をインポートした内容で上書きします。続行しますか？',
+      )
+    ) {
+      return;
+    }
+
+    chrome.storage.local.set(settings, () => {
+      if (chrome.runtime.lastError) {
+        showMessage('設定をインポートできませんでした', true);
+        return;
+      }
+      showMessage('設定をインポートしました');
+      setTimeout(() => window.location.reload(), 500);
+    });
+  } catch (error) {
+    showMessage(
+      error instanceof Error
+        ? error.message
+        : '設定ファイルを読み込めませんでした',
+      true,
+    );
+  }
+});
 
 document.getElementById('btn-sort').onclick = () => {
   chrome.runtime.sendMessage({ action: 'sortTabs' }, (response) => {
