@@ -29,6 +29,7 @@ body {
   border-bottom: 2px solid transparent;
   transition: all 0.2s;
   white-space: nowrap;
+  position: relative;
 }
 .panel-tab.active {
   color: var(--primary);

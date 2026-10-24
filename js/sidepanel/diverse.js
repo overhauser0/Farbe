@@ -4,7 +4,7 @@ export function initDiverseObserver() {
   const countEl = document.getElementById('obs-count');
   const notifyEl = document.getElementById('obs-notify');
   const openLmsBtn = document.getElementById('open-lms-btn');
-  const tabIcon = document.getElementById('icon-diverse');
+  const tabIcon = document.getElementById('indicator-diverse');
 
   const LMS_URL_PATTERN = '*://lms2.s-diverse.com/*';
   const LMS_DEFAULT_URL = 'https://lms2.s-diverse.com/coach/A002007';
@@ -60,7 +60,7 @@ export function initDiverseObserver() {
         statusEl.textContent = '停止中 (LMS未開)';
         statusEl.style.color = '#ef4444';
         countEl.textContent = '-';
-        tabIcon.style.color = '#6b7280'; // 🌟 タブのアイコンをグレーに戻す
+        tabIcon.style.color = '#6b7280';
       }
     });
   }

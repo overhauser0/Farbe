@@ -29,7 +29,7 @@ export function initMakePiece() {
       .split('/')
       .map((p) => p.padStart(2, '0'))
       .join('-');
-    document.getElementById('due-date').value = formatted;
+    document.getElementById('task-date').value = formatted;
   }
 
   document.querySelectorAll('.date-chip').forEach((chip) => {
@@ -55,7 +55,7 @@ export function initMakePiece() {
     const data = {
       taskname: taskname,
       childrenText: document.getElementById('task-content').value,
-      duedate: document.getElementById('due-date').value,
+      date: document.getElementById('task-date').value,
       state: document.getElementById('task-state').value,
       source: document.getElementById('task-source').value,
       url: document.getElementById('task-url').value,
