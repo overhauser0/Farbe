@@ -36,7 +36,7 @@ async function handleMakePiece(data) {
     area: 'Work',
     type: 'Task',
     note: data.note || '',
-    date: data.date || formatDate(new Date()),
+    start_date: data.date || formatDate(new Date()),
     source: data.source || 'LOCAL',
   };
 

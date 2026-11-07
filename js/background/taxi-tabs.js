@@ -12,7 +12,7 @@ function matchPattern(url, pattern) {
   return regex.test(url);
 }
 
-// 追加: URL文字列を配列に変換する共通ヘルパー関数
+// URL文字列を配列に変換する共通ヘルパー関数
 function getPatterns(urlsStr) {
   return urlsStr
     .split('\n')
@@ -165,7 +165,7 @@ async function sortAndGroupTabs() {
     const unpinnedTabs = tabs.filter((t) => !t.pinned);
     if (unpinnedTabs.length === 0) return;
 
-    // 改善：各ルールのURL文字列をループ外で一度だけ配列化（パース）しておく
+    // 各ルールのURL文字列をループ外で一度だけ配列化（パース）しておく
     const parsedRules = tabRules.map((rule) => ({
       ...rule,
       patterns: getPatterns(rule.urls),
