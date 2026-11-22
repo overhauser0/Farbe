@@ -10,6 +10,8 @@ const colors = [
   'orange',
 ];
 
+const validThemes = ['system', 'light', 'dark'];
+
 const settingKeys = [
   'tabRules',
   'blockRules',
@@ -23,6 +25,7 @@ const settingKeys = [
   'lineUserId',
   'wsUrl',
   'wsDeviceName',
+  'theme',
 ];
 
 const defaultSettings = {
@@ -38,6 +41,7 @@ const defaultSettings = {
   lineUserId: '',
   wsUrl: '',
   wsDeviceName: '',
+  theme: 'system',
 };
 
 function escapeHtml(value) {
@@ -146,6 +150,12 @@ function validateSettings(value) {
       if (typeof value[key] !== 'string') return null;
       settings[key] = value[key];
     }
+  }
+
+  if ('theme' in value) {
+    hasKnownSetting = true;
+    if (!validThemes.includes(value.theme)) return null;
+    settings.theme = value.theme;
   }
 
   return hasKnownSetting ? settings : null;
@@ -596,7 +606,7 @@ function createLinkIconSvg() {
   svg.setAttribute('stroke-width', '2');
   svg.setAttribute('stroke-linecap', 'round');
   svg.setAttribute('stroke-linejoin', 'round');
-  svg.style.color = '#9ca3af';
+  svg.style.color = 'var(--text-subtle)';
   svg.style.marginRight = '6px';
   svg.style.flexShrink = '0';
   svg.style.verticalAlign = '-2px';
@@ -688,7 +698,7 @@ function renderNotes() {
         bodyDiv.style.fontSize = '0.9rem';
         bodyDiv.style.color = 'var(--text)';
         bodyDiv.style.whiteSpace = 'pre-wrap';
-        bodyDiv.style.background = '#f9fafb';
+        bodyDiv.style.background = 'var(--surface-subtle)';
         bodyDiv.style.padding = '12px';
         bodyDiv.style.borderRadius = '6px';
         bodyDiv.style.border = '1px solid var(--border)';
@@ -705,7 +715,7 @@ function renderNotes() {
 
     if (noteCount === 0) {
       const emptyDiv = document.createElement('div');
-      emptyDiv.style.color = '#6b7280';
+      emptyDiv.style.color = 'var(--text-muted)';
       emptyDiv.style.fontSize = '0.9rem';
       emptyDiv.style.textAlign = 'center';
       emptyDiv.style.padding = '30px';
@@ -745,6 +755,27 @@ if (document.readyState === 'loading') {
 }
 
 // ==========================================
+// テーマ切り替え（自動 / ライト / ダーク）
+// ==========================================
+const themeButtons = document.querySelectorAll('.theme-option');
+if (themeButtons.length > 0 && window.FarbeTheme) {
+  themeButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const value = btn.getAttribute('data-theme-value');
+      if (value) window.FarbeTheme.set(value);
+    });
+  });
+
+  window.FarbeTheme.subscribe((theme) => {
+    themeButtons.forEach((btn) => {
+      const isSelected = btn.getAttribute('data-theme-value') === theme;
+      btn.classList.toggle('active', isSelected);
+      btn.setAttribute('aria-checked', String(isSelected));
+    });
+  });
+}
+
+// ==========================================
 // WebSocket ステータス表示のリアルタイム更新
 // ==========================================
 
@@ -754,19 +785,13 @@ function updateWsBadge(status) {
 
   if (status === 'connected') {
     badge.textContent = '🟢 Connected';
-    badge.style.color = '#15803d';
-    badge.style.background = '#dcfce7';
-    badge.style.border = '1px solid #86efac';
+    badge.className = 'status-badge status-badge--success';
   } else if (status === 'connecting') {
     badge.textContent = '🟡 Connecting...';
-    badge.style.color = '#a16207';
-    badge.style.background = '#fef9c3';
-    badge.style.border = '1px solid #fde047';
+    badge.className = 'status-badge status-badge--warn';
   } else {
     badge.textContent = '🔴 Disconnected';
-    badge.style.color = '#b91c1c';
-    badge.style.background = '#fee2e2';
-    badge.style.border = '1px solid #fca5a5';
+    badge.className = 'status-badge status-badge--error';
   }
 }
 

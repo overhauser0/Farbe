@@ -89,6 +89,22 @@ async function consumePendingTab() {
   }
 }
 
+// テーマ切替ボタン
+const themeToggleBtn = document.getElementById('theme-toggle');
+if (themeToggleBtn && window.FarbeTheme) {
+  themeToggleBtn.addEventListener('click', () => {
+    window.FarbeTheme.toggle();
+  });
+  window.FarbeTheme.subscribe((theme, effective) => {
+    const label =
+      effective === 'dark'
+        ? 'ライトモードに切替'
+        : 'ダークモードに切替';
+    themeToggleBtn.title = label;
+    themeToggleBtn.setAttribute('aria-label', label);
+  });
+}
+
 // 設定画面を開く
 document.getElementById('open-options').addEventListener('click', () => {
   chrome.runtime.openOptionsPage();

@@ -5,6 +5,7 @@
     <title>Farbe Sidepanel</title>
     <link rel="stylesheet" href="css/global.css" />
     <link rel="stylesheet" href="css/sidepanel.css" />
+    <script src="js/theme.js"></script>
     <script src="js/lib/qrious.min.js"></script>
   </head>
   <body>
@@ -55,6 +56,32 @@
         </svg>
         QR
       </div>
+      <button
+        type="button"
+        class="settings-link theme-toggle-btn"
+        id="theme-toggle"
+        title="ダーク / ライトモード切替"
+        aria-label="ダーク / ライトモード切替"
+      >
+        <span class="icon-moon">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </span>
+        <span class="icon-sun">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+        </span>
+      </button>
       <div class="settings-link" id="open-options" title="設定を開く">
         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="12" cy="12" r="3"></circle>
@@ -336,8 +363,8 @@
             margin-bottom: 12px;
           "
         >
-          <span style="color: #6b7280">監視状態:</span
-          ><span id="obs-status" style="font-weight: 600; color: #ef4444"
+          <span style="color: var(--text-muted)">監視状態:</span
+          ><span id="obs-status" style="font-weight: 600; color: var(--danger)"
             >停止中</span
           >
         </div>
@@ -348,21 +375,12 @@
             margin-bottom: 12px;
           "
         >
-          <span style="color: #6b7280">監視対象:</span
+          <span style="color: var(--text-muted)">監視対象:</span
           ><span id="obs-count" style="font-weight: 600">0個</span>
         </div>
-        <div style="display: flex; justify-content: space-between">
-          <span style="color: #6b7280">通知設定:</span
-          ><span
-            id="obs-notify"
-            style="
-              background: #f3f4f6;
-              padding: 4px 8px;
-              border-radius: 4px;
-              font-size: 0.75rem;
-            "
-            >設定を確認中...</span
-          >
+        <div style="display: flex; justify-content: space-between; align-items: center">
+          <span style="color: var(--text-muted)">通知設定:</span
+          ><span id="obs-notify" class="status-badge">設定を確認中...</span>
         </div>
       </div>
       <button id="open-lms-btn" class="btn-icon">
@@ -427,22 +445,12 @@
           </button>
         </div>
       </div>
-      <div
-        style="
-          text-align: center;
-          margin: 15px 0;
-          background: #fff;
-          padding: 15px;
-          border-radius: 8px;
-          border: 1px solid var(--border);
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          min-height: 150px;
-        "
-      >
+      <div class="qr-preview-box">
         <canvas id="qr-canvas" style="display: none"></canvas>
-        <div id="qr-placeholder" style="color: #9ca3af; font-size: 0.85rem">
+        <div
+          id="qr-placeholder"
+          style="color: var(--text-muted); font-size: 0.85rem"
+        >
           URLを入力すると<br />QRコードが生成されます
         </div>
       </div>

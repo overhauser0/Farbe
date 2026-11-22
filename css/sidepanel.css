@@ -44,7 +44,7 @@ body {
   padding: 12px 0;
   font-size: 0.85rem;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-muted);
   cursor: pointer;
   border-bottom: 2px solid transparent;
   transition: all 0.2s;
@@ -56,22 +56,47 @@ body {
   border-bottom: 2px solid var(--primary);
 }
 .panel-tab:hover:not(.active) {
-  background-color: #f9fafb;
+  background-color: var(--surface-subtle);
 }
 
-/* --- 設定アイコン --- */
+/* --- テーマ切り替え＆設定アイコン --- */
 .settings-link {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 16px;
-  color: #9ca3af;
+  padding: 0 12px;
+  color: var(--text-subtle);
   cursor: pointer;
   transition: color 0.2s;
   border-left: 1px solid var(--border);
+  background: transparent;
+  border-top: none;
+  border-right: none;
+  border-bottom: none;
+  border-radius: 0;
 }
 .settings-link:hover {
   color: var(--primary);
+}
+.theme-toggle-btn .icon-sun {
+  display: none;
+}
+.theme-toggle-btn .icon-moon {
+  display: inline-flex;
+}
+:root[data-theme='dark'] .theme-toggle-btn .icon-sun {
+  display: inline-flex;
+}
+:root[data-theme='dark'] .theme-toggle-btn .icon-moon {
+  display: none;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .theme-toggle-btn .icon-sun {
+    display: inline-flex;
+  }
+  :root:not([data-theme='light']) .theme-toggle-btn .icon-moon {
+    display: none;
+  }
 }
 
 /* --- コンテンツエリア --- */
@@ -107,7 +132,7 @@ body {
   display: block;
   font-size: 0.75rem;
   font-weight: 700;
-  color: #9ca3af;
+  color: var(--text-subtle);
   margin-bottom: 6px;
   padding-left: 4px;
   letter-spacing: 0.05em;
@@ -123,7 +148,7 @@ body {
   left: 12px;
   top: 50%;
   transform: translateY(-50%);
-  color: #9ca3af;
+  color: var(--text-subtle);
   pointer-events: none;
 }
 input.input-field,
@@ -143,7 +168,7 @@ input.input-field:focus,
 textarea.input-field:focus,
 select.input-field:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 0 0 2px var(--focus-ring);
   outline: none;
 }
 textarea.input-field {
@@ -154,7 +179,7 @@ textarea.input-field {
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: 8px;
-  color: #6b7280;
+  color: var(--text-muted);
   min-width: 42px;
   min-height: 42px;
   cursor: pointer;
@@ -186,7 +211,7 @@ textarea.input-field {
 .btn-icon:hover:not(:disabled),
 .btn-icon.active:not(:disabled) {
   background: var(--primary);
-  color: white;
+  color: var(--primary-contrast);
   border-color: var(--primary);
 }
 .btn-icon:disabled {
@@ -204,7 +229,7 @@ textarea.input-field {
   border-radius: 20px;
   font-size: 0.75rem;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--text-muted);
   cursor: pointer;
   transition: all 0.2s;
   white-space: nowrap;
@@ -212,14 +237,14 @@ textarea.input-field {
 .date-chip:hover,
 .date-chip.active {
   background: var(--primary);
-  color: white;
+  color: var(--primary-contrast);
   border-color: var(--primary);
 }
 .btn-submit {
   width: 100%;
   padding: 12px;
   background-color: var(--primary);
-  color: white;
+  color: var(--primary-contrast);
   border: none;
   border-radius: 8px;
   font-size: 0.95rem;
@@ -227,12 +252,12 @@ textarea.input-field {
   cursor: pointer;
   transition: 0.2s;
   margin-top: 10px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
 .btn-submit:hover:not(:disabled) {
   background-color: var(--primary-hover);
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
 }
 .btn-submit:active:not(:disabled) {
   transform: translateY(0);
@@ -246,7 +271,7 @@ textarea.input-field {
 }
 #current-url {
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--text-muted);
   word-break: break-all;
   white-space: nowrap;
   overflow: hidden;
@@ -275,10 +300,10 @@ textarea.input-field {
 }
 #note-area:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 #note-area:disabled {
-  background-color: #e5e7eb;
+  background-color: var(--disabled-bg);
   cursor: not-allowed;
 }
 .status {
@@ -296,4 +321,23 @@ textarea.input-field {
 }
 .status.show {
   opacity: 1;
+}
+
+/* --- QRコード表示ボックス（ダークモードでも読み取りやすい白余白を確保） --- */
+.qr-preview-box {
+  text-align: center;
+  margin: 15px 0;
+  background: var(--card-bg);
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 150px;
+}
+#qr-canvas {
+  background: #ffffff;
+  padding: 10px;
+  border-radius: 6px;
 }

@@ -37,12 +37,10 @@ export function initDiverseObserver() {
       settings.lineUserId
     ) {
       notifyEl.textContent = 'ブラウザ + LINE';
-      notifyEl.style.background = '#dcfce7';
-      notifyEl.style.color = '#166534';
+      notifyEl.className = 'status-badge status-badge--success';
     } else {
       notifyEl.textContent = 'ブラウザのみ';
-      notifyEl.style.background = '#fefce8';
-      notifyEl.style.color = '#a16207';
+      notifyEl.className = 'status-badge status-badge--warn';
     }
 
     // 2. 全LMSタブの監視状態を確認

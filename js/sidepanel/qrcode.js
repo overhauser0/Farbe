@@ -44,7 +44,7 @@ export function initQRCode() {
     if (!trimmed) {
       canvas.style.display = 'none';
       placeholder.innerHTML = DEFAULT_PLACEHOLDER_HTML;
-      placeholder.style.color = '#9ca3af';
+      placeholder.style.color = 'var(--text-muted)';
       placeholder.style.display = 'block';
       copyBtn.disabled = true;
       downloadBtn.disabled = true;
@@ -61,7 +61,7 @@ export function initQRCode() {
       console.error('QR generation error:', error);
       canvas.style.display = 'none';
       placeholder.textContent = '文字数が長すぎるためQRコードを生成できません';
-      placeholder.style.color = '#ef4444';
+      placeholder.style.color = 'var(--danger)';
       placeholder.style.display = 'block';
       copyBtn.disabled = true;
       downloadBtn.disabled = true;
