@@ -14,123 +14,187 @@ function matchPattern(url, pattern) {
 
 // URL文字列を配列に変換する共通ヘルパー関数
 function getPatterns(urlsStr) {
-  return urlsStr
+  return String(urlsStr || '')
     .split('\n')
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
 }
 
-let isSorting = false;
+function upsertContextMenu(id, properties) {
+  chrome.contextMenus.update(id, properties, () => {
+    if (chrome.runtime.lastError) {
+      chrome.contextMenus.create({ id, ...properties }, () => {
+        void chrome.runtime.lastError;
+      });
+    }
+  });
+}
+
+function findMatchingGroup(groups, rule, usedGroupIds = new Set()) {
+  const exactMatch = groups.find(
+    (g) =>
+      !usedGroupIds.has(g.id) &&
+      g.title === rule.title &&
+      g.color === rule.color,
+  );
+  if (exactMatch) return exactMatch;
+
+  if (rule.title) {
+    return (
+      groups.find((g) => !usedGroupIds.has(g.id) && g.title === rule.title) ||
+      null
+    );
+  }
+  return null;
+}
+
+const sortingWindows = new Set();
+const pendingSortWindows = new Set();
+
+async function isManagedGroup(groupId, windowId, tabRules) {
+  if (groupId === chrome.tabGroups.TAB_GROUP_ID_NONE || groupId == null) {
+    return false;
+  }
+  try {
+    const group = await chrome.tabGroups.get(groupId);
+    if (!group || group.windowId !== windowId) return false;
+    return tabRules.some(
+      (rule) =>
+        (rule.title && group.title === rule.title) ||
+        (group.title === rule.title && group.color === rule.color),
+    );
+  } catch {
+    return false;
+  }
+}
 
 // タブの更新検知（ソート・ピン留め・クローズ処理）
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  if (isSorting) return;
+  if (!changeInfo.url && !(changeInfo.status === 'complete' && tab.url)) {
+    return;
+  }
+  if (!tab.url) return;
 
-  if (changeInfo.url || (changeInfo.status === 'complete' && tab.url)) {
-    const result = await chrome.storage.local.get([
-      'tabRules',
-      'blockRules',
-      'pinRules',
-      'autoSort',
-    ]);
-    const tabRules = result.tabRules || [];
-    const blockRules = result.blockRules || [];
-    const pinRules = result.pinRules || [];
-    const autoSort = result.autoSort || false;
+  const result = await chrome.storage.local.get([
+    'tabRules',
+    'blockRules',
+    'pinRules',
+    'autoSort',
+  ]);
+  const tabRules = result.tabRules || [];
+  const blockRules = result.blockRules || [];
+  const pinRules = result.pinRules || [];
+  const autoSort = result.autoSort || false;
 
-    // 1. 自動クローズ処理
-    for (const rule of blockRules) {
-      if (!rule.targetUrl) continue;
-      if (matchPattern(tab.url, rule.targetUrl)) {
-        if (rule.openerUrl) {
-          if (!tab.openerTabId) continue;
-          try {
-            const openerTab = await chrome.tabs.get(tab.openerTabId);
-            if (!matchPattern(openerTab.url, rule.openerUrl)) continue;
-          } catch (e) {
-            continue;
-          }
+  // 1. 自動クローズ処理
+  for (const rule of blockRules) {
+    if (!rule.targetUrl) continue;
+    if (matchPattern(tab.url, rule.targetUrl)) {
+      if (rule.openerUrl) {
+        if (!tab.openerTabId) continue;
+        try {
+          const openerTab = await chrome.tabs.get(tab.openerTabId);
+          if (!matchPattern(openerTab.url, rule.openerUrl)) continue;
+        } catch {
+          continue;
         }
+      }
+      try {
         await chrome.tabs.remove(tabId);
-        return;
+      } catch {
+        // タブが既に閉じられている場合は無視
       }
+      return;
     }
+  }
 
-    // 2. Auto Pin処理
-    let shouldPin = false;
-    for (const rule of pinRules) {
-      if (
-        getPatterns(rule.urls).some((pattern) => matchPattern(tab.url, pattern))
-      ) {
-        shouldPin = true;
-        break;
-      }
+  // 2. Auto Pin処理
+  let shouldPin = false;
+  for (const rule of pinRules) {
+    if (
+      getPatterns(rule.urls).some((pattern) => matchPattern(tab.url, pattern))
+    ) {
+      shouldPin = true;
+      break;
     }
+  }
 
-    if (shouldPin && !tab.pinned) {
+  if (shouldPin && !tab.pinned) {
+    try {
       await chrome.tabs.update(tabId, { pinned: true });
+    } catch {
+      return;
     }
+  }
 
-    // 3. 共通のルールマッチ判定（重複を排除）
-    let matchedRule = null;
-    for (const rule of tabRules) {
-      if (
-        getPatterns(rule.urls).some((pattern) => matchPattern(tab.url, pattern))
+  // 3. 共通のルールマッチ判定（重複を排除）
+  let matchedRule = null;
+  for (const rule of tabRules) {
+    if (
+      getPatterns(rule.urls).some((pattern) => matchPattern(tab.url, pattern))
+    ) {
+      matchedRule = rule;
+      break;
+    }
+  }
+
+  // 4. グループ化・ソート処理
+  const windowId = tab.windowId;
+  if (autoSort) {
+    if (sortingWindows.has(windowId)) {
+      pendingSortWindows.add(windowId);
+      return;
+    }
+    // autoSortが有効な場合（ルール管理グループに属する非該当タブのみ解除）
+    if (
+      !matchedRule &&
+      tab.openerTabId &&
+      (await isManagedGroup(tab.groupId, windowId, tabRules))
+    ) {
+      try {
+        await chrome.tabs.ungroup(tabId);
+      } catch {}
+    }
+    await sortAndGroupTabs(windowId);
+  } else {
+    // autoSortが無効で、かつピン留め対象のタブはここで終了
+    if (shouldPin || tab.pinned) return;
+    if (sortingWindows.has(windowId)) return;
+
+    sortingWindows.add(windowId);
+    try {
+      if (matchedRule) {
+        const allGroups = await chrome.tabGroups.query({ windowId });
+        const existingGroup = findMatchingGroup(allGroups, matchedRule);
+        let groupId;
+        if (existingGroup) {
+          groupId = existingGroup.id;
+          if (tab.groupId !== groupId) {
+            await chrome.tabs.group({ tabIds: tabId, groupId });
+          }
+        } else {
+          groupId = await chrome.tabs.group({ tabIds: tabId });
+          await chrome.tabGroups.update(groupId, {
+            color: matchedRule.color,
+            title: matchedRule.title,
+          });
+        }
+      } else if (
+        tab.openerTabId &&
+        (await isManagedGroup(tab.groupId, windowId, tabRules))
       ) {
-        matchedRule = rule;
-        break;
-      }
-    }
-
-    // 4. グループ化・ソート処理
-    if (autoSort) {
-      // autoSortが有効な場合（ピン留め状態に関わらずソートを実行）
-      if (!matchedRule && tab.openerTabId) {
+        // TaxiTabs管理グループから開かれた非該当タブのみグループ解除＆末尾へ移動
         try {
           await chrome.tabs.ungroup(tabId);
-        } catch (e) {}
+        } catch {}
+        try {
+          await chrome.tabs.move(tabId, { index: -1 });
+        } catch {}
       }
-      await sortAndGroupTabs();
-    } else {
-      // autoSortが無効で、かつピン留め対象のタブはここで終了
-      if (shouldPin || tab.pinned) return;
-
-      isSorting = true;
-      try {
-        if (matchedRule) {
-          const existingGroups = await chrome.tabGroups.query({
-            title: matchedRule.title,
-            windowId: tab.windowId,
-          });
-          let groupId;
-          if (existingGroups.length > 0) {
-            groupId = existingGroups[0].id;
-            if (tab.groupId !== groupId) {
-              await chrome.tabs.group({ tabIds: tabId, groupId: groupId });
-            }
-          } else {
-            groupId = await chrome.tabs.group({ tabIds: tabId });
-            await chrome.tabGroups.update(groupId, {
-              color: matchedRule.color,
-              title: matchedRule.title,
-            });
-            setTimeout(() => {
-              chrome.tabGroups
-                .update(groupId, { title: matchedRule.title })
-                .catch(() => {});
-            }, 150);
-          }
-        } else if (tab.openerTabId) {
-          try {
-            await chrome.tabs.ungroup(tabId);
-          } catch (e) {}
-          try {
-            await chrome.tabs.move(tabId, { index: -1 });
-          } catch (e) {}
-        }
-      } finally {
-        isSorting = false;
-      }
+    } catch (error) {
+      console.error('TaxiTabs update error:', error);
+    } finally {
+      sortingWindows.delete(windowId);
     }
   }
 });
@@ -146,18 +210,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
     return true;
   }
+  return false;
 });
 
 // メインのソートロジック
-async function sortAndGroupTabs() {
-  if (isSorting) return;
-  isSorting = true;
+async function sortAndGroupTabs(targetWindowId = null) {
+  let windowId = targetWindowId;
+  if (windowId == null) {
+    const win = await chrome.windows.getLastFocused();
+    if (!win) return;
+    windowId = win.id;
+  }
+
+  if (sortingWindows.has(windowId)) {
+    pendingSortWindows.add(windowId);
+    return;
+  }
+  sortingWindows.add(windowId);
 
   try {
-    const window = await chrome.windows.getLastFocused();
-    if (!window) return;
-    const windowId = window.id;
-
     const tabs = await chrome.tabs.query({ windowId });
     const result = await chrome.storage.local.get(['tabRules']);
     const tabRules = result.tabRules || [];
@@ -180,7 +251,7 @@ async function sortAndGroupTabs() {
               groupIdx: g,
               patternIdx: p,
               originalIdx: tab.index,
-              rule: rule,
+              rule,
             };
           }
         }
@@ -207,30 +278,59 @@ async function sortAndGroupTabs() {
       return a.rank.originalIdx - b.rank.originalIdx;
     });
 
+    const allGroupsBefore = await chrome.tabGroups.query({ windowId });
+    const managedGroupIds = new Set(
+      allGroupsBefore
+        .filter((g) =>
+          tabRules.some(
+            (r) =>
+              (r.title && g.title === r.title) ||
+              (g.title === r.title && g.color === r.color),
+          ),
+        )
+        .map((g) => g.id),
+    );
+
+    const ruleGroupIds = new Map();
+    const usedGroupIds = new Set();
+
     for (let g = 0; g < tabRules.length; g++) {
       const rule = tabRules[g];
       const ruleTabs = rankedTabs.filter((t) => t.rank.groupIdx === g);
 
       if (ruleTabs.length > 0) {
-        const existingGroups = await chrome.tabGroups.query({
-          title: rule.title,
-          windowId,
-        });
+        const currentGroups = await chrome.tabGroups.query({ windowId });
+        const existingGroup = findMatchingGroup(
+          currentGroups,
+          rule,
+          usedGroupIds,
+        );
         let targetGroupId;
+        let firstTabAlreadyGrouped = false;
 
-        if (existingGroups.length > 0) {
-          targetGroupId = existingGroups[0].id;
+        if (existingGroup) {
+          targetGroupId = existingGroup.id;
         } else {
           targetGroupId = await chrome.tabs.group({ tabIds: ruleTabs[0].id });
+          firstTabAlreadyGrouped = true;
           await chrome.tabGroups.update(targetGroupId, {
             color: rule.color,
             title: rule.title,
           });
         }
 
+        usedGroupIds.add(targetGroupId);
+        managedGroupIds.add(targetGroupId);
+        ruleGroupIds.set(g, targetGroupId);
+
         const tabsToGroup = ruleTabs
-          .filter((t) => t.groupId !== targetGroupId)
+          .filter(
+            (t, idx) =>
+              !(firstTabAlreadyGrouped && idx === 0) &&
+              t.groupId !== targetGroupId,
+          )
           .map((t) => t.id);
+
         if (tabsToGroup.length > 0) {
           await chrome.tabs.group({
             tabIds: tabsToGroup,
@@ -241,13 +341,14 @@ async function sortAndGroupTabs() {
     }
 
     const unmatchedTabs = rankedTabs.filter((t) => t.rank.groupIdx === 9999);
+    // ルール管理下のグループに誤って属している非該当タブのみ解除（手動グループは保護）
     const tabsToUngroup = unmatchedTabs
-      .filter((t) => t.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE)
+      .filter((t) => managedGroupIds.has(t.groupId))
       .map((t) => t.id);
     if (tabsToUngroup.length > 0) {
       try {
         await chrome.tabs.ungroup(tabsToUngroup);
-      } catch (e) {}
+      } catch {}
     }
 
     const freshTabs = await chrome.tabs.query({ windowId });
@@ -270,49 +371,54 @@ async function sortAndGroupTabs() {
 
       for (let g = 0; g < tabRules.length; g++) {
         const ruleTabs = rankedTabs.filter((t) => t.rank.groupIdx === g);
-        if (ruleTabs.length > 0) {
-          const existingGroups = await chrome.tabGroups.query({
-            title: tabRules[g].title,
-            windowId,
-          });
-          if (existingGroups.length > 0) {
-            const groupId = existingGroups[0].id;
+        const groupId = ruleGroupIds.get(g);
+        if (ruleTabs.length > 0 && groupId != null) {
+          try {
+            await chrome.tabGroups.move(groupId, { index: currentIndex });
+          } catch {}
+          for (let i = 0; i < ruleTabs.length; i++) {
             try {
-              await chrome.tabGroups.move(groupId, { index: currentIndex });
-            } catch (e) {}
-            for (let i = 0; i < ruleTabs.length; i++) {
-              try {
-                await chrome.tabs.move(ruleTabs[i].id, {
-                  index: currentIndex + i,
-                });
-              } catch (e) {}
-            }
-            currentIndex += ruleTabs.length;
+              await chrome.tabs.move(ruleTabs[i].id, {
+                index: currentIndex + i,
+              });
+            } catch {}
           }
+          currentIndex += ruleTabs.length;
         }
       }
 
-      if (unmatchedTabs.length > 0) {
-        const unmatchedIds = unmatchedTabs.map((t) => t.id);
+      const freshTabMap = new Map(freshTabs.map((t) => [t.id, t]));
+      const ungroupedUnmatchedIds = unmatchedTabs
+        .filter((t) => {
+          const current = freshTabMap.get(t.id);
+          return (
+            current && current.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE
+          );
+        })
+        .map((t) => t.id);
+
+      if (ungroupedUnmatchedIds.length > 0) {
         try {
-          await chrome.tabs.move(unmatchedIds, { index: -1 });
-        } catch (e) {}
+          await chrome.tabs.move(ungroupedUnmatchedIds, { index: -1 });
+        } catch {}
       }
     }
   } finally {
-    isSorting = false;
+    sortingWindows.delete(windowId);
+    if (pendingSortWindows.has(windowId)) {
+      pendingSortWindows.delete(windowId);
+      void sortAndGroupTabs(windowId);
+    }
   }
 }
 
-// コンテキストメニュー（右クリック）の設定を1つに統合
+// コンテキストメニュー（右クリック）の設定を安全に登録
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.create({
-    id: 'closeAllAndNewTab',
+  upsertContextMenu('closeAllAndNewTab', {
     title: '🗑️ タブをすべて閉じる',
     contexts: ['action'],
   });
-  chrome.contextMenus.create({
-    id: 'sort-tabs',
+  upsertContextMenu('sort-tabs', {
     title: '🗃️ タブを整理・並び替え',
     contexts: ['action'],
   });
@@ -321,22 +427,34 @@ chrome.runtime.onInstalled.addListener(() => {
 // クリック処理
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === 'closeAllAndNewTab') {
-    handleCloseAllAndNewTab();
+    handleCloseAllAndNewTab(tab?.windowId ?? null);
   }
   if (info.menuItemId === 'sort-tabs') {
-    sortAndGroupTabs();
+    sortAndGroupTabs(tab?.windowId ?? null);
   }
 });
 
-async function handleCloseAllAndNewTab() {
+async function handleCloseAllAndNewTab(targetWindowId = null) {
   const { closeAllIncludePinned } = await chrome.storage.local.get(
     'closeAllIncludePinned',
   );
 
-  const existingTabs = await chrome.tabs.query({});
-  const newTab = await chrome.tabs.create({});
+  let windowId = targetWindowId;
+  if (windowId == null) {
+    const win = await chrome.windows.getLastFocused();
+    windowId = win?.id ?? null;
+  }
+
+  const queryOptions = windowId != null ? { windowId } : { currentWindow: true };
+  const existingTabs = await chrome.tabs.query(queryOptions);
+  const createOptions = windowId != null ? { windowId } : {};
+  const newTab = await chrome.tabs.create(createOptions);
+
   const tabsToClose = existingTabs
-    .filter((t) => (closeAllIncludePinned ? true : !t.pinned))
+    .filter(
+      (t) =>
+        t.id !== newTab.id && (closeAllIncludePinned ? true : !t.pinned),
+    )
     .map((t) => t.id);
 
   if (tabsToClose.length > 0) {

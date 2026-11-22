@@ -1,7 +1,13 @@
 // コンテンツスクリプト - 評価ボタンの監視
+const BUTTON_SELECTOR =
+  'button, input[type="button"], input[type="submit"], [role="button"], a[onclick]';
+
 class EvaluationButtonMonitor {
   constructor() {
     this.observedButtons = new Map();
+    this.elementIds = new WeakMap();
+    this.nextButtonSeq = 1;
+    this.rescanTimer = null;
     this.debugMode = false; // デバッグモード
     console.log('EvaluationButtonMonitor: 初期化開始');
     this.init();
@@ -18,45 +24,55 @@ class EvaluationButtonMonitor {
     // DOM変更を監視
     this.setupMutationObserver();
 
+    // 監視中ボタンの状態チェックと削除要素のクリーンアップ（単一インターバル）
+    setInterval(() => this.pollObservedButtons(), 2000);
+
     // 定期的な再スキャン（フォールバック）
     setInterval(() => this.scanForButtons(), 10000);
+  }
+
+  scheduleRescan(delay = 500) {
+    clearTimeout(this.rescanTimer);
+    this.rescanTimer = setTimeout(() => {
+      this.rescanTimer = null;
+      this.scanForButtons();
+    }, delay);
+  }
+
+  pollObservedButtons() {
+    for (const [buttonId, data] of Array.from(this.observedButtons.entries())) {
+      if (!document.contains(data.element)) {
+        console.log('EvaluationButtonMonitor: 要素が削除されました:', buttonId);
+        data.observer?.disconnect();
+        this.observedButtons.delete(buttonId);
+        continue;
+      }
+      this.checkButtonState(data.element, buttonId);
+    }
   }
 
   scanForButtons() {
     console.log('EvaluationButtonMonitor: ボタンスキャン開始');
 
-    // より広範囲な検索パターン
-    const selectors = [
-      'button',
-      'input[type="button"]',
-      'input[type="submit"]',
-      '[role="button"]',
-      'a[onclick]',
-    ];
-
-    let foundButtons = 0;
+    const elements = document.querySelectorAll(BUTTON_SELECTOR);
+    const foundButtons = elements.length;
     let evaluationButtons = 0;
 
-    selectors.forEach((selector) => {
-      const elements = document.querySelectorAll(selector);
-      foundButtons += elements.length;
+    elements.forEach((element) => {
+      const text = this.getElementText(element);
+      if (this.isEvaluationButton(text)) {
+        evaluationButtons++;
+        const buttonId = this.getButtonId(element);
 
-      elements.forEach((element) => {
-        const text = this.getElementText(element);
-        if (this.isEvaluationButton(text)) {
-          evaluationButtons++;
-          const buttonId = this.getButtonId(element);
-
-          if (!this.observedButtons.has(buttonId)) {
-            console.log(
-              'EvaluationButtonMonitor: 評価ボタンを発見:',
-              text,
-              element,
-            );
-            this.observeButton(element, buttonId);
-          }
+        if (!this.observedButtons.has(buttonId)) {
+          console.log(
+            'EvaluationButtonMonitor: 評価ボタンを発見:',
+            text,
+            element,
+          );
+          this.observeButton(element, buttonId);
         }
-      });
+      }
     });
 
     console.log(
@@ -119,17 +135,29 @@ class EvaluationButtonMonitor {
       document.body.appendChild(debugDiv);
     }
 
-    debugDiv.innerHTML = `
-      <strong>DiverseLMS監視デバッグ</strong><br>
-      全ボタン: ${totalButtons}個<br>
-      評価ボタン: ${evaluationButtons}個<br>
-      監視中: ${this.observedButtons.size}個<br>
-      URL: ${location.pathname}<br>
-      時刻: ${new Date().toLocaleTimeString()}
-    `;
+    debugDiv.textContent = '';
+    const title = document.createElement('strong');
+    title.textContent = 'DiverseLMS監視デバッグ';
+    debugDiv.appendChild(title);
+
+    const lines = [
+      `全ボタン: ${totalButtons}個`,
+      `評価ボタン: ${evaluationButtons}個`,
+      `監視中: ${this.observedButtons.size}個`,
+      `URL: ${location.pathname}`,
+      `時刻: ${new Date().toLocaleTimeString()}`,
+    ];
+    for (const line of lines) {
+      debugDiv.appendChild(document.createElement('br'));
+      debugDiv.appendChild(document.createTextNode(line));
+    }
   }
 
   getButtonId(element) {
+    if (this.elementIds.has(element)) {
+      return this.elementIds.get(element);
+    }
+
     const tr = element.closest('tr');
     let keyText = '';
 
@@ -145,7 +173,9 @@ class EvaluationButtonMonitor {
       keyText = this.getElementText(element);
     }
 
-    return `btn_${keyText}`;
+    const uniqueId = `btn_${this.nextButtonSeq++}_${keyText}`;
+    this.elementIds.set(element, uniqueId);
+    return uniqueId;
   }
 
   observeButton(element, buttonId) {
@@ -153,42 +183,27 @@ class EvaluationButtonMonitor {
 
     // 初期状態を記録
     const isDisabled = this.isElementDisabled(element);
-    this.observedButtons.set(buttonId, {
-      element: element,
-      wasDisabled: isDisabled,
-      lastCheck: Date.now(),
-      selector: this.getElementSelector(element),
-    });
-
-    // MutationObserverでボタンの状態変更を監視
     const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
+      for (const mutation of mutations) {
         if (mutation.type === 'attributes') {
           this.checkButtonState(element, buttonId);
+          break;
         }
-      });
+      }
     });
 
     observer.observe(element, {
       attributes: true,
-      attributeFilter: ['disabled', 'class', 'aria-disabled'],
+      attributeFilter: ['disabled', 'class', 'aria-disabled', 'style'],
     });
 
-    // 定期的なポーリングも併用
-    const pollInterval = setInterval(() => {
-      if (!document.contains(element)) {
-        console.log('EvaluationButtonMonitor: 要素が削除されました:', buttonId);
-        clearInterval(pollInterval);
-        observer.disconnect();
-        this.observedButtons.delete(buttonId);
-        return;
-      }
-      this.checkButtonState(element, buttonId);
-    }, 2000);
-
-    // オブザーバーとインターバルを保存
-    this.observedButtons.get(buttonId).observer = observer;
-    this.observedButtons.get(buttonId).pollInterval = pollInterval;
+    this.observedButtons.set(buttonId, {
+      element,
+      wasDisabled: isDisabled,
+      lastCheck: Date.now(),
+      selector: this.getElementSelector(element),
+      observer,
+    });
   }
 
   isElementDisabled(element) {
@@ -206,9 +221,10 @@ class EvaluationButtonMonitor {
     // 要素のセレクターを生成（デバッグ用）
     const tagName = element.tagName.toLowerCase();
     const id = element.id ? `#${element.id}` : '';
-    const className = element.className
-      ? `.${element.className.split(' ').join('.')}`
-      : '';
+    const className =
+      typeof element.className === 'string' && element.className.trim()
+        ? `.${element.className.trim().split(/\s+/).join('.')}`
+        : '';
     return `${tagName}${id}${className}`;
   }
 
@@ -246,7 +262,12 @@ class EvaluationButtonMonitor {
 
     if (tr) {
       const trT = getTdTextsFromTr(tr);
-      notificationText = `${trT[1]} ${trT[3]} No.${trT[4]} prog.${trT[5].trim()}`;
+      if (trT.length >= 6) {
+        notificationText = `${trT[1]} ${trT[3]} No.${trT[4]} prog.${(trT[5] || '').trim()}`;
+      } else {
+        const joined = trT.filter(Boolean).join(' ');
+        if (joined) notificationText = joined;
+      }
       // 長すぎる場合は切り詰める
       if (notificationText.length > 200) {
         notificationText = notificationText.substring(0, 200) + '...';
@@ -269,7 +290,7 @@ class EvaluationButtonMonitor {
         data: {
           title: 'Diverse要点書き出し完了',
           message: notificationText,
-          url: 'https://lms2.s-diverse.com/',
+          url: location.href || 'https://lms2.s-diverse.com/',
         },
       },
       () => {
@@ -281,36 +302,37 @@ class EvaluationButtonMonitor {
       },
     );
   }
+
   setupMutationObserver() {
+    if (!document.body) return;
+
     // ページ全体のDOM変更を監視して新しいボタンを検出
     const pageObserver = new MutationObserver((mutations) => {
       let shouldRescan = false;
 
-      mutations.forEach((mutation) => {
+      for (const mutation of mutations) {
         if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-          mutation.addedNodes.forEach((node) => {
+          for (const node of mutation.addedNodes) {
             if (node.nodeType === Node.ELEMENT_NODE) {
               // 新しく追加された要素内に評価ボタンがあるかチェック
               const hasButton =
                 node.matches &&
-                (node.matches(
-                  'button, input[type="button"], input[type="submit"], [role="button"]',
-                ) ||
-                  node.querySelector(
-                    'button, input[type="button"], input[type="submit"], [role="button"]',
-                  ));
+                (node.matches(BUTTON_SELECTOR) ||
+                  node.querySelector(BUTTON_SELECTOR));
 
               if (hasButton) {
                 shouldRescan = true;
+                break;
               }
             }
-          });
+          }
         }
-      });
+        if (shouldRescan) break;
+      }
 
       if (shouldRescan) {
         console.log('EvaluationButtonMonitor: DOM変更を検出、再スキャンを実行');
-        setTimeout(() => this.scanForButtons(), 500);
+        this.scheduleRescan(500);
       }
     });
 
@@ -323,22 +345,23 @@ class EvaluationButtonMonitor {
   }
 
   // デバッグ用: 手動でボタン一覧を取得
-  getAllButtons() {
-    const buttons = document.querySelectorAll(
-      'button, input[type="button"], input[type="submit"], [role="button"]',
-    );
+  getAllButtons(includeElement = true) {
+    const buttons = document.querySelectorAll(BUTTON_SELECTOR);
     const buttonInfo = [];
 
     buttons.forEach((btn, index) => {
       const text = this.getElementText(btn);
       const disabled = this.isElementDisabled(btn);
-      buttonInfo.push({
+      const entry = {
         index,
         text,
         disabled,
-        element: btn,
         isEvaluation: this.isEvaluationButton(text),
-      });
+      };
+      if (includeElement) {
+        entry.element = btn;
+      }
+      buttonInfo.push(entry);
     });
 
     return buttonInfo;
@@ -357,46 +380,43 @@ function getTdTextsFromTr(trElement) {
   return result;
 }
 
-// メッセージリスナーを追加（ポップアップからの状態問い合わせ用）
+// メッセージリスナーを追加（サイドパネルからの状態問い合わせ用）
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'GET_STATUS') {
     const monitor = document.monitor;
     const buttonCount = monitor ? monitor.observedButtons.size : 0;
 
-    // デバッグ情報も含めて返す
+    // 構造化クローン可能なデバッグ情報のみ返す
     const debugInfo = monitor
       ? {
-          allButtons: monitor.getAllButtons(),
+          allButtons: monitor.getAllButtons(false),
           observedCount: buttonCount,
           url: location.href,
           timestamp: Date.now(),
         }
       : null;
 
-    console.log(
-      'EvaluationButtonMonitor: ステータス問い合わせ応答 - 監視中ボタン数:',
-      buttonCount,
-    );
-    if (debugInfo) {
-      console.log(
-        'EvaluationButtonMonitor: 全ボタン情報:',
-        debugInfo.allButtons,
-      );
-    }
-
     sendResponse({
-      buttonCount: buttonCount,
-      debugInfo: debugInfo,
+      buttonCount,
+      debugInfo,
     });
-  } else if (message.type === 'FORCE_SCAN') {
-    // 強制スキャン
-    if (document.monitor) {
-      document.monitor.scanForButtons();
-      sendResponse({ success: true });
-    }
+    return false;
   }
 
-  return true; // 非同期レスポンス
+  if (message.type === 'FORCE_SCAN') {
+    if (document.monitor) {
+      document.monitor.scanForButtons();
+      sendResponse({
+        success: true,
+        buttonCount: document.monitor.observedButtons.size,
+      });
+    } else {
+      sendResponse({ success: false, buttonCount: 0 });
+    }
+    return false;
+  }
+
+  return false;
 });
 
 // ページロード後に監視を開始

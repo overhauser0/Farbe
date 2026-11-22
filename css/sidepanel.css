@@ -18,8 +18,28 @@ body {
   border-bottom: 1px solid var(--border);
   background: var(--card-bg);
 }
+.icon {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.icon-title {
+  width: 18px;
+  height: 18px;
+  color: var(--primary);
+}
 .panel-tab {
   flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   text-align: center;
   padding: 12px 0;
   font-size: 0.85rem;
@@ -77,9 +97,9 @@ body {
   align-items: center;
   gap: 8px;
 }
-.content-title i {
+.content-title i,
+.content-title svg {
   color: var(--primary);
-  font-size: 1.2rem;
 }
 
 /* --- フォーム等各種スタイル --- */
@@ -147,11 +167,31 @@ textarea.input-field {
   font-size: 0.9rem;
   gap: 8px;
 }
-.btn-icon:hover,
-.btn-icon.active {
+.btn-icon .icon-default,
+.btn-icon .icon-success {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn-icon .icon-success {
+  display: none;
+  color: #10b981;
+}
+.btn-icon.is-success .icon-default {
+  display: none;
+}
+.btn-icon.is-success .icon-success {
+  display: inline-flex;
+}
+.btn-icon:hover:not(:disabled),
+.btn-icon.active:not(:disabled) {
   background: var(--primary);
   color: white;
   border-color: var(--primary);
+}
+.btn-icon:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 .date-chips {
   display: flex;
@@ -189,13 +229,19 @@ textarea.input-field {
   margin-top: 10px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
-.btn-submit:hover {
+.btn-submit:hover:not(:disabled) {
   background-color: var(--primary-hover);
   transform: translateY(-1px);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
 }
-.btn-submit:active {
+.btn-submit:active:not(:disabled) {
   transform: translateY(0);
+  box-shadow: none;
+}
+.btn-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
   box-shadow: none;
 }
 #current-url {
@@ -236,6 +282,10 @@ textarea.input-field {
   cursor: not-allowed;
 }
 .status {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
   font-size: 0.75rem;
   color: #10b981;
   text-align: right;
