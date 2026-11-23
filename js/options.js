@@ -10,6 +10,8 @@ const colors = [
   'orange',
 ];
 
+const validThemes = ['system', 'light', 'dark'];
+
 const settingKeys = [
   'tabRules',
   'blockRules',
@@ -23,6 +25,7 @@ const settingKeys = [
   'lineUserId',
   'wsUrl',
   'wsDeviceName',
+  'theme',
 ];
 
 const defaultSettings = {
@@ -38,6 +41,7 @@ const defaultSettings = {
   lineUserId: '',
   wsUrl: '',
   wsDeviceName: '',
+  theme: 'system',
 };
 
 function escapeHtml(value) {
@@ -148,15 +152,45 @@ function validateSettings(value) {
     }
   }
 
+  if ('theme' in value) {
+    hasKnownSetting = true;
+    if (!validThemes.includes(value.theme)) return null;
+    settings.theme = value.theme;
+  }
+
   return hasKnownSetting ? settings : null;
+}
+
+let messageTimer = null;
+
+function formatLocalDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function isSafeHttpUrl(rawUrl) {
+  if (typeof rawUrl !== 'string' || !rawUrl.trim()) return false;
+  try {
+    const parsed = new URL(rawUrl.trim());
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
 }
 
 function showMessage(message, isError = false) {
   const msg = document.getElementById('message');
+  clearTimeout(messageTimer);
   msg.textContent = message;
-  msg.style.color = isError ? '#ef4444' : '#10b981';
+  msg.classList.toggle('message-error', isError);
+  msg.classList.toggle('message-success', !isError);
   msg.classList.add('show');
-  setTimeout(() => msg.classList.remove('show'), 3000);
+  messageTimer = setTimeout(() => {
+    msg.classList.remove('show');
+    messageTimer = null;
+  }, 3000);
 }
 
 // === 画面描画処理 ===
@@ -196,18 +230,18 @@ function renderBlockRules(rules) {
     div.className = 'rule-card';
     div.innerHTML = `
       <div class="rule-header">
-        <div class="controls" style="margin-left: auto;">
+        <div class="controls controls-right">
           <button class="btn-up" data-type="block" data-index="${index}">↑</button>
           <button class="btn-down" data-type="block" data-index="${index}">↓</button>
           <button class="btn-delete" data-type="block" data-index="${index}">削除</button>
         </div>
       </div>
-      <div style="display: flex; gap: 15px; margin-bottom: 5px;">
-        <div style="flex: 1;">
+      <div class="rule-row">
+        <div class="rule-column">
           <label>親URL (空白可):</label>
           <input type="text" class="block-opener" value="${escapeHtml(rule.openerUrl || '')}" placeholder="例: *twitter.com*">
         </div>
-        <div style="flex: 1;">
+        <div class="rule-column">
           <label>閉じるURL (必須):</label>
           <input type="text" class="block-target" value="${escapeHtml(rule.targetUrl || '')}" placeholder="例: *spam.com*">
         </div>
@@ -368,9 +402,7 @@ document.getElementById('save-rules').onclick = () => {
         showMessage('設定を保存できませんでした', true);
         return;
       }
-      const msg = document.getElementById('message');
-      msg.classList.add('show');
-      setTimeout(() => msg.classList.remove('show'), 2000);
+      showMessage('保存しました！');
     },
   );
 };
@@ -394,7 +426,7 @@ document.getElementById('export-settings').addEventListener('click', () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `farbe-settings-${new Date().toISOString().slice(0, 10)}.json`;
+    link.download = `farbe-settings-${formatLocalDate(new Date())}.json`;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     showMessage('設定をエクスポートしました');
@@ -451,23 +483,11 @@ settingsFile.addEventListener('change', async () => {
 
 document.getElementById('btn-sort').onclick = () => {
   chrome.runtime.sendMessage({ action: 'sortTabs' }, (response) => {
-    const msg = document.getElementById('message');
-
     if (chrome.runtime.lastError || !response || !response.success) {
-      msg.textContent = 'エラーが発生しました';
-      msg.style.color = '#ef4444';
+      showMessage('エラーが発生しました', true);
     } else {
-      msg.textContent = 'タブを整理しました！';
-      msg.style.color = '#10b981';
+      showMessage('タブを整理しました！');
     }
-    msg.classList.add('show');
-    setTimeout(() => {
-      msg.classList.remove('show');
-      setTimeout(() => {
-        msg.textContent = '保存しました！';
-        msg.style.color = '#10b981';
-      }, 300);
-    }, 2000);
   });
 };
 
@@ -531,14 +551,40 @@ chrome.storage.local.get(
 );
 
 document.getElementById('test-line-btn').addEventListener('click', () => {
-  chrome.runtime.sendMessage({
-    type: 'SEND_NOTIFICATION',
-    data: {
-      title: 'テスト通知',
-      message: 'Farbe: LMS評価ボタン監視のテスト通知です。',
-      url: 'https://lms2.s-diverse.com/',
+  const lineEnabled = document.getElementById('line-enabled').checked;
+  const lineAccessToken = document.getElementById('line-token').value.trim();
+  const lineUserId = document.getElementById('line-userid').value.trim();
+
+  chrome.runtime.sendMessage(
+    {
+      type: 'SEND_NOTIFICATION',
+      data: {
+        title: 'テスト通知',
+        message: 'Farbe: LMS評価ボタン監視のテスト通知です。',
+        url: 'https://lms2.s-diverse.com/',
+      },
+      settingsOverride: {
+        lineEnabled,
+        lineAccessToken,
+        lineUserId,
+      },
     },
-  });
+    (response) => {
+      if (chrome.runtime.lastError) {
+        showMessage('テスト通知の送信に失敗しました', true);
+        return;
+      }
+      if (!response || !response.success) {
+        showMessage(response?.error || 'LINE通知の送信に失敗しました', true);
+        return;
+      }
+      showMessage(
+        response.lineSent
+          ? 'ブラウザ + LINE テスト通知を送信しました！'
+          : 'ブラウザのテスト通知を送信しました！',
+      );
+    },
+  );
 });
 
 const navLinks = document.querySelectorAll('.nav-link');
@@ -550,57 +596,106 @@ const btnSort = document.getElementById('btn-sort');
 // Page Note: メモ管理ロジック
 // ==========================================
 
-// メモ一覧を描画する関数
+function createLinkIconSvg() {
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('width', '14');
+  svg.setAttribute('height', '14');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '2');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.classList.add('link-icon');
+
+  const path1 = document.createElementNS(svgNS, 'path');
+  path1.setAttribute(
+    'd',
+    'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71',
+  );
+  const path2 = document.createElementNS(svgNS, 'path');
+  path2.setAttribute(
+    'd',
+    'M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71',
+  );
+  svg.appendChild(path1);
+  svg.appendChild(path2);
+  return svg;
+}
+
+// メモ一覧を描画する関数（DOM API で安全に構築し XSS を防止）
 function renderNotes() {
   chrome.storage.local.get(null, (items) => {
     const notesContainer = document.getElementById('notes-list-container');
-    notesContainer.innerHTML = '';
+    notesContainer.textContent = '';
 
     let noteCount = 0;
 
-    // ストレージの全データから note_ で始まるものだけを抽出
+    // ストレージの全データから note_ で始まる文字列のみを抽出
     for (const [key, value] of Object.entries(items)) {
-      if (key.startsWith('note_') && value.trim() !== '') {
+      if (
+        key.startsWith('note_') &&
+        typeof value === 'string' &&
+        value.trim() !== ''
+      ) {
         noteCount++;
-        const url = key.replace('note_', '');
+        const url = key.slice('note_'.length);
 
         const noteDiv = document.createElement('div');
-        noteDiv.className = 'rule-card'; // 既存の美しいカードスタイルを流用
-        noteDiv.style.display = 'flex';
-        noteDiv.style.flexDirection = 'column';
-        noteDiv.style.gap = '10px';
+        noteDiv.className = 'rule-card note-card';
 
-        noteDiv.innerHTML = `
-          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-            <div style="font-size: 0.85rem; font-weight: 600; color: var(--primary); word-break: break-all; margin-right: 15px;">
-              <i class="fas fa-link" style="color: #9ca3af; margin-right: 4px;"></i>
-              <a href="${url}" target="_blank" style="color: var(--primary); text-decoration: none;">${url}</a>
-            </div>
-            <button class="btn-delete delete-note-btn" data-key="${key}" style="flex-shrink: 0; padding: 6px 12px;">削除</button>
-          </div>
-          <div style="font-size: 0.9rem; color: var(--text); white-space: pre-wrap; background: #f9fafb; padding: 12px; border-radius: 6px; border: 1px solid var(--border); max-height: 150px; overflow-y: auto; line-height: 1.5;">${value}</div>
-        `;
+        const headerRow = document.createElement('div');
+        headerRow.className = 'note-header';
 
+        const urlWrapper = document.createElement('div');
+        urlWrapper.className = 'note-url';
+        urlWrapper.appendChild(createLinkIconSvg());
+
+        if (isSafeHttpUrl(url)) {
+          const link = document.createElement('a');
+          link.href = url;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          link.className = 'note-link';
+          link.textContent = url;
+          urlWrapper.appendChild(link);
+        } else {
+          const urlSpan = document.createElement('span');
+          urlSpan.textContent = url;
+          urlWrapper.appendChild(urlSpan);
+        }
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'btn-delete delete-note-btn';
+        deleteBtn.textContent = '削除';
+        deleteBtn.addEventListener('click', () => {
+          if (confirm('このメモを削除してもよろしいですか？')) {
+            chrome.storage.local.remove(key, () => {
+              renderNotes();
+            });
+          }
+        });
+
+        headerRow.appendChild(urlWrapper);
+        headerRow.appendChild(deleteBtn);
+
+        const bodyDiv = document.createElement('div');
+        bodyDiv.className = 'note-body';
+        bodyDiv.textContent = value;
+
+        noteDiv.appendChild(headerRow);
+        noteDiv.appendChild(bodyDiv);
         notesContainer.appendChild(noteDiv);
       }
     }
 
     if (noteCount === 0) {
-      notesContainer.innerHTML =
-        '<div style="color: #6b7280; font-size: 0.9rem; text-align: center; padding: 30px; background: var(--card-bg); border-radius: 12px; border: 1px dashed var(--border);">保存されているメモはありません。</div>';
+      const emptyDiv = document.createElement('div');
+      emptyDiv.className = 'notes-empty';
+      emptyDiv.textContent = '保存されているメモはありません。';
+      notesContainer.appendChild(emptyDiv);
     }
-
-    // 個別削除ボタンのイベント
-    document.querySelectorAll('.delete-note-btn').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        const key = e.target.getAttribute('data-key');
-        if (confirm('このメモを削除してもよろしいですか？')) {
-          chrome.storage.local.remove(key, () => {
-            renderNotes(); // 削除後に再描画
-          });
-        }
-      });
-    });
   });
 }
 
@@ -615,22 +710,41 @@ document.getElementById('delete-all-notes').addEventListener('click', () => {
       );
       chrome.storage.local.remove(keysToRemove, () => {
         renderNotes(); // 削除後に再描画
-        const msg = document.getElementById('message');
-        msg.textContent = '全メモを削除しました';
-        msg.classList.add('show');
-        setTimeout(() => {
-          msg.classList.remove('show');
-          msg.textContent = '保存しました！'; // 元に戻す
-        }, 2000);
+        showMessage('全メモを削除しました');
       });
     });
   }
 });
 
 // 設定画面を開いた時（初期化時）にメモ一覧を描画する
-document.addEventListener('DOMContentLoaded', () => {
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    renderNotes();
+  });
+} else {
   renderNotes();
-});
+}
+
+// ==========================================
+// テーマ切り替え（自動 / ライト / ダーク）
+// ==========================================
+const themeButtons = document.querySelectorAll('.theme-option');
+if (themeButtons.length > 0 && window.FarbeTheme) {
+  themeButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const value = btn.getAttribute('data-theme-value');
+      if (value) window.FarbeTheme.set(value);
+    });
+  });
+
+  window.FarbeTheme.subscribe((theme) => {
+    themeButtons.forEach((btn) => {
+      const isSelected = btn.getAttribute('data-theme-value') === theme;
+      btn.classList.toggle('active', isSelected);
+      btn.setAttribute('aria-checked', String(isSelected));
+    });
+  });
+}
 
 // ==========================================
 // WebSocket ステータス表示のリアルタイム更新
@@ -642,19 +756,13 @@ function updateWsBadge(status) {
 
   if (status === 'connected') {
     badge.textContent = '🟢 Connected';
-    badge.style.color = '#4ade80'; // Noir Glass風のネオングリーン
-    badge.style.background = 'rgba(74, 222, 128, 0.15)';
-    badge.style.border = '1px solid rgba(74, 222, 128, 0.3)';
+    badge.className = 'status-badge status-badge--success';
   } else if (status === 'connecting') {
     badge.textContent = '🟡 Connecting...';
-    badge.style.color = '#facc15';
-    badge.style.background = 'rgba(250, 204, 21, 0.15)';
-    badge.style.border = '1px solid rgba(250, 204, 21, 0.3)';
+    badge.className = 'status-badge status-badge--warn';
   } else {
     badge.textContent = '🔴 Disconnected';
-    badge.style.color = '#f87171';
-    badge.style.background = 'rgba(248, 113, 113, 0.15)';
-    badge.style.border = '1px solid rgba(248, 113, 113, 0.3)';
+    badge.className = 'status-badge status-badge--error';
   }
 }
 
@@ -688,6 +796,10 @@ navLinks.forEach((link) => {
         app.classList.remove('active');
       }
     });
+
+    // クリックしたナビゲーションリンクを即座にアクティブ化（スクロール不要なアプリ対応）
+    navLinks.forEach((item) => item.classList.remove('active'));
+    link.classList.add('active');
 
     // TaxiTabsを見ている時だけ「Sort Tabs」ボタンを表示
     if (targetAppId === 'taxitabs') {

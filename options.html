@@ -1,9 +1,11 @@
 <!doctype html>
-<html>
+<html lang="ja">
   <head>
     <meta charset="utf-8" />
+    <meta name="description" content="Farbeの設定ページ" />
     <title>Farbe</title>
     <link rel="stylesheet" href="css/global.css" />
+    <script src="js/theme.js"></script>
   </head>
   <body>
     <aside class="sidebar">
@@ -65,6 +67,21 @@
           >
         </nav>
       </div>
+
+      <div class="theme-switcher-section">
+        <div class="nav-group-title">Appearance</div>
+        <div class="theme-segmented" role="radiogroup" aria-label="テーマ切替">
+          <button type="button" class="theme-option" data-theme-value="system">
+            自動
+          </button>
+          <button type="button" class="theme-option" data-theme-value="light">
+            ライト
+          </button>
+          <button type="button" class="theme-option" data-theme-value="dark">
+            ダーク
+          </button>
+        </div>
+      </div>
     </aside>
 
     <main class="main-content" id="scroll-area">
@@ -80,18 +97,16 @@
               <span class="slider"></span>
             </label>
             <div>
-              <div
-                style="font-weight: 600; font-size: 0.95rem; color: var(--text)"
-              >
-                Auto Sort (自動整理)
-              </div>
-              <div style="font-size: 0.85rem; color: #6b7280; margin-top: 2px">
+              <div class="toggle-title">Auto Sort (自動整理)</div>
+              <div class="toggle-description">
                 タブが開かれた時やURLが変わった時に、自動的に全体を並び替えます
               </div>
             </div>
           </div>
           <div id="tab-rules-container"></div>
-          <button id="add-tab-rule" class="btn-add">＋ Add Group Rule</button>
+          <button type="button" id="add-tab-rule" class="btn-add">
+            ＋ Add Group Rule
+          </button>
         </section>
 
         <hr class="section-divider" />
@@ -107,18 +122,16 @@
               <span class="slider"></span>
             </label>
             <div>
-              <div
-                style="font-weight: 600; font-size: 0.95rem; color: var(--text)"
-              >
-                All Tabs Kill
-              </div>
-              <div style="font-size: 0.85rem; color: #6b7280; margin-top: 2px">
+              <div class="toggle-title">All Tabs Kill</div>
+              <div class="toggle-description">
                 拡張機能アイコンメニュー「タブをすべて閉じる」の時、ピン設定されたタブも削除します
               </div>
             </div>
           </div>
           <div id="block-rules-container"></div>
-          <button id="add-block-rule" class="btn-add">＋ Add Kill Rule</button>
+          <button type="button" id="add-block-rule" class="btn-add">
+            ＋ Add Kill Rule
+          </button>
         </section>
 
         <hr class="section-divider" />
@@ -129,7 +142,9 @@
             マッチしたタブを自動的にピン留めし、アイコンのみの最小サイズで左端に固定します。
           </p>
           <div id="pin-rules-container"></div>
-          <button id="add-pin-rule" class="btn-add">＋ Add Pin Rule</button>
+          <button type="button" id="add-pin-rule" class="btn-add">
+            ＋ Add Pin Rule
+          </button>
         </section>
       </div>
 
@@ -141,27 +156,34 @@
             Noteで保存されたメモの一覧です。不要なメモを確認・削除できます。
           </p>
 
-          <div
-            style="
-              display: flex;
-              justify-content: flex-end;
-              margin-bottom: 15px;
-            "
-          >
+          <div class="notes-actions">
             <button
+              type="button"
               id="delete-all-notes"
-              class="btn-delete"
-              style="padding: 10px 16px"
+              class="btn-delete delete-notes-button"
             >
-              <i class="fas fa-trash-alt" style="margin-right: 6px"></i>
+              <svg
+                viewBox="0 0 24 24"
+                width="14"
+                height="14"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+                <path d="M10 11v6"></path>
+                <path d="M14 11v6"></path>
+                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
+              </svg>
               全てのメモを一括削除
             </button>
           </div>
 
-          <div
-            id="notes-list-container"
-            style="display: flex; flex-direction: column; gap: 15px"
-          ></div>
+          <div id="notes-list-container" class="notes-list"></div>
         </section>
       </div>
 
@@ -180,7 +202,7 @@
                 placeholder="https://n8n.your-domain.com/webhook/..."
               />
             </div>
-            <div class="input-group" style="margin-top: 15px">
+            <div class="input-group input-group-space-top">
               <label>API Key:</label>
               <input
                 type="password"
@@ -201,18 +223,11 @@
           <div class="toggle-container">
             <label class="toggle-switch">
               <input type="checkbox" checked disabled />
-              <span
-                class="slider"
-                style="background-color: var(--primary)"
-              ></span>
+              <span class="slider slider-primary"></span>
             </label>
             <div>
-              <div
-                style="font-weight: 600; font-size: 0.95rem; color: var(--text)"
-              >
-                ブラウザ通知 (常時ON)
-              </div>
-              <div style="font-size: 0.85rem; color: #6b7280; margin-top: 2px">
+              <div class="toggle-title">ブラウザ通知 (常時ON)</div>
+              <div class="toggle-description">
                 ブラウザの通知設定で許可されている必要があります
               </div>
             </div>
@@ -233,33 +248,25 @@
               <span class="slider"></span>
             </label>
             <div>
-              <div
-                style="font-weight: 600; font-size: 0.95rem; color: var(--text)"
-              >
-                LINE通知を有効にする
-              </div>
+              <div class="toggle-title">LINE通知を有効にする</div>
             </div>
           </div>
 
           <div id="line-settings-container" class="rule-card hidden">
-            <div class="input-group" style="margin-bottom: 15px">
-              <label style="width: 140px">アクセストークン:</label>
+            <div class="input-group input-group-space-bottom">
+              <label class="label-width-140">アクセストークン:</label>
               <input
                 type="password"
                 id="line-token"
                 placeholder="Channel Access Token"
               />
             </div>
-            <div class="input-group" style="margin-bottom: 20px">
-              <label style="width: 140px">ユーザーID:</label>
+            <div class="input-group input-group-space-bottom-large">
+              <label class="label-width-140">ユーザーID:</label>
               <input type="text" id="line-userid" placeholder="User ID" />
             </div>
-            <div style="display: flex; justify-content: flex-end">
-              <button
-                id="test-line-btn"
-                class="btn-sort"
-                style="background: white"
-              >
+            <div class="flex-end">
+              <button type="button" id="test-line-btn" class="btn-sort">
                 🔔 テスト通知を送信
               </button>
             </div>
@@ -268,7 +275,10 @@
               <h4>📋 LINE通知の設定手順</h4>
               <ol>
                 <li>
-                  <a href="https://developers.line.biz/console/" target="_blank"
+                  <a
+                    href="https://developers.line.biz/console/"
+                    target="_blank"
+                    rel="noopener noreferrer"
                     >LINE Developers コンソール</a
                   >にアクセス
                 </li>
@@ -287,26 +297,9 @@
       </div>
       <div id="app-atlas" class="app-container">
         <section id="websocket-setting" class="section">
-          <div
-            style="
-              display: flex;
-              align-items: center;
-              gap: 12px;
-              margin-bottom: 15px;
-            "
-          >
-            <h2 style="margin: 0">WebSocket Setting</h2>
-            <span
-              id="ws-status-badge"
-              style="
-                padding: 4px 10px;
-                border-radius: 6px;
-                font-size: 12px;
-                font-weight: bold;
-                background: rgba(255, 255, 255, 0.1);
-                transition: all 0.3s;
-              "
-            >
+          <div class="ws-header">
+            <h2>WebSocket Setting</h2>
+            <span id="ws-status-badge" class="status-badge">
               ⚪️ Checking...
             </span>
           </div>
@@ -315,15 +308,15 @@
           </p>
           <div class="rule-card">
             <div class="input-group">
-              <label style="width: 120px">WebSocket URL:</label>
+              <label class="label-width-120">WebSocket URL:</label>
               <input
                 type="text"
                 id="ws-url"
                 placeholder="wss://atlas.your-domain.com"
               />
             </div>
-            <div class="input-group" style="margin-top: 15px">
-              <label style="width: 120px">Device Name:</label>
+            <div class="input-group input-group-space-top">
+              <label class="label-width-120">Device Name:</label>
               <input
                 type="text"
                 id="ws-device-name"
@@ -337,22 +330,27 @@
 
     <div class="actions-fixed">
       <span id="message">保存しました！</span>
-      <button id="btn-sort" class="btn-sort">Sort Tabs</button>
+      <button type="button" id="btn-sort" class="btn-sort">Sort Tabs</button>
       <button
+        type="button"
         id="export-settings"
         class="btn-sort"
         title="APIキーやアクセストークンを含みます"
       >
         設定をエクスポート
       </button>
-      <button id="import-settings" class="btn-sort">設定をインポート</button>
+      <button type="button" id="import-settings" class="btn-sort">
+        設定をインポート
+      </button>
       <input
         id="settings-file"
         type="file"
         accept=".json,application/json"
         hidden
       />
-      <button id="save-rules" class="btn-save">Save Settings</button>
+      <button type="button" id="save-rules" class="btn-save">
+        Save Settings
+      </button>
     </div>
 
     <script src="js/options.js"></script>
