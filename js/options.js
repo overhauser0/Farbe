@@ -184,7 +184,8 @@ function showMessage(message, isError = false) {
   const msg = document.getElementById('message');
   clearTimeout(messageTimer);
   msg.textContent = message;
-  msg.style.color = isError ? '#ef4444' : '#10b981';
+  msg.classList.toggle('message-error', isError);
+  msg.classList.toggle('message-success', !isError);
   msg.classList.add('show');
   messageTimer = setTimeout(() => {
     msg.classList.remove('show');
@@ -229,18 +230,18 @@ function renderBlockRules(rules) {
     div.className = 'rule-card';
     div.innerHTML = `
       <div class="rule-header">
-        <div class="controls" style="margin-left: auto;">
+        <div class="controls controls-right">
           <button class="btn-up" data-type="block" data-index="${index}">↑</button>
           <button class="btn-down" data-type="block" data-index="${index}">↓</button>
           <button class="btn-delete" data-type="block" data-index="${index}">削除</button>
         </div>
       </div>
-      <div style="display: flex; gap: 15px; margin-bottom: 5px;">
-        <div style="flex: 1;">
+      <div class="rule-row">
+        <div class="rule-column">
           <label>親URL (空白可):</label>
           <input type="text" class="block-opener" value="${escapeHtml(rule.openerUrl || '')}" placeholder="例: *twitter.com*">
         </div>
-        <div style="flex: 1;">
+        <div class="rule-column">
           <label>閉じるURL (必須):</label>
           <input type="text" class="block-target" value="${escapeHtml(rule.targetUrl || '')}" placeholder="例: *spam.com*">
         </div>
@@ -606,10 +607,7 @@ function createLinkIconSvg() {
   svg.setAttribute('stroke-width', '2');
   svg.setAttribute('stroke-linecap', 'round');
   svg.setAttribute('stroke-linejoin', 'round');
-  svg.style.color = 'var(--text-subtle)';
-  svg.style.marginRight = '6px';
-  svg.style.flexShrink = '0';
-  svg.style.verticalAlign = '-2px';
+  svg.classList.add('link-icon');
 
   const path1 = document.createElementNS(svgNS, 'path');
   path1.setAttribute(
@@ -645,22 +643,13 @@ function renderNotes() {
         const url = key.slice('note_'.length);
 
         const noteDiv = document.createElement('div');
-        noteDiv.className = 'rule-card';
-        noteDiv.style.display = 'flex';
-        noteDiv.style.flexDirection = 'column';
-        noteDiv.style.gap = '10px';
+        noteDiv.className = 'rule-card note-card';
 
         const headerRow = document.createElement('div');
-        headerRow.style.display = 'flex';
-        headerRow.style.justifyContent = 'space-between';
-        headerRow.style.alignItems = 'flex-start';
+        headerRow.className = 'note-header';
 
         const urlWrapper = document.createElement('div');
-        urlWrapper.style.fontSize = '0.85rem';
-        urlWrapper.style.fontWeight = '600';
-        urlWrapper.style.color = 'var(--primary)';
-        urlWrapper.style.wordBreak = 'break-all';
-        urlWrapper.style.marginRight = '15px';
+        urlWrapper.className = 'note-url';
         urlWrapper.appendChild(createLinkIconSvg());
 
         if (isSafeHttpUrl(url)) {
@@ -668,8 +657,7 @@ function renderNotes() {
           link.href = url;
           link.target = '_blank';
           link.rel = 'noopener noreferrer';
-          link.style.color = 'var(--primary)';
-          link.style.textDecoration = 'none';
+          link.className = 'note-link';
           link.textContent = url;
           urlWrapper.appendChild(link);
         } else {
@@ -680,8 +668,6 @@ function renderNotes() {
 
         const deleteBtn = document.createElement('button');
         deleteBtn.className = 'btn-delete delete-note-btn';
-        deleteBtn.style.flexShrink = '0';
-        deleteBtn.style.padding = '6px 12px';
         deleteBtn.textContent = '削除';
         deleteBtn.addEventListener('click', () => {
           if (confirm('このメモを削除してもよろしいですか？')) {
@@ -695,16 +681,7 @@ function renderNotes() {
         headerRow.appendChild(deleteBtn);
 
         const bodyDiv = document.createElement('div');
-        bodyDiv.style.fontSize = '0.9rem';
-        bodyDiv.style.color = 'var(--text)';
-        bodyDiv.style.whiteSpace = 'pre-wrap';
-        bodyDiv.style.background = 'var(--surface-subtle)';
-        bodyDiv.style.padding = '12px';
-        bodyDiv.style.borderRadius = '6px';
-        bodyDiv.style.border = '1px solid var(--border)';
-        bodyDiv.style.maxHeight = '150px';
-        bodyDiv.style.overflowY = 'auto';
-        bodyDiv.style.lineHeight = '1.5';
+        bodyDiv.className = 'note-body';
         bodyDiv.textContent = value;
 
         noteDiv.appendChild(headerRow);
@@ -715,13 +692,7 @@ function renderNotes() {
 
     if (noteCount === 0) {
       const emptyDiv = document.createElement('div');
-      emptyDiv.style.color = 'var(--text-muted)';
-      emptyDiv.style.fontSize = '0.9rem';
-      emptyDiv.style.textAlign = 'center';
-      emptyDiv.style.padding = '30px';
-      emptyDiv.style.background = 'var(--card-bg)';
-      emptyDiv.style.borderRadius = '12px';
-      emptyDiv.style.border = '1px dashed var(--border)';
+      emptyDiv.className = 'notes-empty';
       emptyDiv.textContent = '保存されているメモはありません。';
       notesContainer.appendChild(emptyDiv);
     }
