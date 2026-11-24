@@ -402,6 +402,10 @@ document.getElementById('save-rules').onclick = () => {
         showMessage('設定を保存できませんでした', true);
         return;
       }
+      chrome.runtime.sendMessage({ type: 'RETRY_WS_ON_ERROR' }, () => {
+        // バックグラウンド未応答時は無視
+        void chrome.runtime.lastError;
+      });
       showMessage('保存しました！');
     },
   );
@@ -752,7 +756,11 @@ if (themeButtons.length > 0 && window.FarbeTheme) {
 
 function updateWsBadge(status) {
   const badge = document.getElementById('ws-status-badge');
+  const messageEl = document.getElementById('ws-status-message');
   if (!badge) return;
+
+  let detailMessage = '';
+  let detailTone = '';
 
   if (status === 'connected') {
     badge.textContent = '🟢 Connected';
@@ -760,9 +768,37 @@ function updateWsBadge(status) {
   } else if (status === 'connecting') {
     badge.textContent = '🟡 Connecting...';
     badge.className = 'status-badge status-badge--warn';
+  } else if (status === 'unconfigured') {
+    badge.textContent = '⚠️ API Key Not Set';
+    badge.className = 'status-badge status-badge--warn';
+    detailMessage =
+      'Make Piece 設定の API Key が未設定のため WebSocket 接続を開始していません。API Key を設定して保存してください。';
+    detailTone = 'ws-status-message--warn';
+  } else if (status === 'auth_failed') {
+    badge.textContent = '🔴 Auth Failed (4003)';
+    badge.className = 'status-badge status-badge--error';
+    detailMessage =
+      '認証に失敗しました (4003)。Make Piece 設定の API Key が Atlas サーバーと一致しているか確認し、保存してください。';
+    detailTone = 'ws-status-message--error';
+  } else if (status === 'server_unconfigured') {
+    badge.textContent = '🔴 Server Key Unset (1008)';
+    badge.className = 'status-badge status-badge--error';
+    detailMessage =
+      'Atlas サーバー側で ATLAS_API_KEY が未設定です (1008)。サーバー側の設定を確認したあと、設定を保存して再接続してください。';
+    detailTone = 'ws-status-message--error';
   } else {
     badge.textContent = '🔴 Disconnected';
     badge.className = 'status-badge status-badge--error';
+  }
+
+  if (messageEl) {
+    if (detailMessage) {
+      messageEl.textContent = detailMessage;
+      messageEl.className = `ws-status-message ${detailTone}`;
+    } else {
+      messageEl.textContent = '';
+      messageEl.className = 'ws-status-message hidden';
+    }
   }
 }
 

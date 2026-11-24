@@ -650,6 +650,26 @@ button {
   background: var(--badge-error-bg);
   border-color: var(--badge-error-border);
 }
+.ws-status-message {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  border: 1px solid var(--badge-neutral-border);
+  background: var(--badge-neutral-bg);
+  color: var(--badge-neutral-text);
+}
+.ws-status-message--warn {
+  color: var(--badge-warn-text);
+  background: var(--badge-warn-bg);
+  border-color: var(--badge-warn-border);
+}
+.ws-status-message--error {
+  color: var(--badge-error-text);
+  background: var(--badge-error-bg);
+  border-color: var(--badge-error-border);
+}
 
 .toggle-container {
   display: flex;
